@@ -1,0 +1,26 @@
+{#- Namensliste einer Gruppe: Startnummern mit leeren Zeilen für die Namen.
+    Die Namen trägt die Klassenleitung von Hand ein – die Anwendung kennt sie nicht. -#}
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Namensliste {{ gruppe.name }}</title></head>
+<body>
+  <header class="kopf">
+    <span>{{ schule.name }}</span>
+    <span>Radfahrausbildung · Schuljahr {{ gruppe.schuljahr }}</span>
+  </header>
+  <h1>Namensliste {{ gruppe.name }}</h1>
+  <p class="hinweis">Bitte die Namen <strong>von Hand</strong> eintragen. Jedes Kind trägt bei jedem
+    Übungs- und Prüfungslauf <strong>dieselbe Startnummer</strong>. Mit dieser Liste ordnet die Klassenleitung
+    die Feedbackbögen den Kindern zu.</p>
+  <table class="liste">
+    <thead><tr><th class="nr">Nr.</th><th>Vor- und Nachname</th><th class="notiz">Notiz</th></tr></thead>
+    <tbody>
+      {% for k in kinder %}
+        <tr><td class="nr">{{ k.startnummer }}</td><td></td><td></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="fuss">Diese Liste enthält nach dem Ausfüllen personenbezogene Daten. Bei der Klassenleitung
+    aufbewahren, nicht weitergeben und nach Ende der Radfahrausbildung vernichten.</p>
+</body>
+</html>

@@ -1,0 +1,19 @@
+/* Namensliste: Startnummern mit Schreibzeilen. */
+
+@page { size: A4; margin: 14mm 16mm 14mm 16mm; @bottom-right { content: "Seite " counter(page) " von " counter(pages); font-size: 8.5pt; } }
+
+body { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; font-size: 11pt; color: #000; }
+
+.kopf { display: flex; justify-content: space-between; font-size: 9pt; border-bottom: 1px solid #000; padding-bottom: 2mm; }
+h1 { font-size: 20pt; margin: 6mm 0 2mm; }
+.hinweis { margin: 0 0 4mm; }
+
+.liste { width: 100%; border-collapse: collapse; }
+.liste thead { display: table-header-group; }
+.liste th { text-align: left; font-size: 10pt; border-bottom: 1.2pt solid #000; padding: 1.5mm 2mm; }
+.liste td { height: 10mm; border-bottom: 0.6pt solid #666; padding: 0 2mm; vertical-align: bottom; }
+.liste tr { break-inside: avoid; }
+.nr { width: 16mm; font-size: 15pt; font-weight: bold; }
+.notiz { width: 45mm; }
+
+.fuss { margin-top: 5mm; font-size: 8.5pt; color: #333; }

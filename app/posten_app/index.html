@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Posten">
+  <meta name="theme-color" content="#000000">
+  <meta name="format-detection" content="telephone=no">
+  <title>Posten</title>
+  <link rel="manifest" href="__MANIFEST__">
+  <link rel="apple-touch-icon" href="/p/assets/icon-180.png">
+  <link rel="stylesheet" href="/p/assets/css/posten.css">
+  <script type="module" src="/p/assets/js/main.js"></script>
+</head>
+<body>
+
+  <!-- Wird angezeigt, bis die Konfiguration geladen ist -->
+  <div id="laden" class="vollbild mitte">
+    <p class="gross">Wird geladen …</p>
+  </div>
+
+  <!-- Fehler beim Laden -->
+  <div id="fehler" class="vollbild mitte spalte" hidden>
+    <p class="gross" id="fehler-text"></p>
+    <button type="button" class="knopf knopf-neben schmal" id="erneut">Erneut versuchen</button>
+  </div>
+
+  <!-- Nach dem Lauf: alles übertragen, lokale Daten gelöscht -->
+  <div id="fertig" class="vollbild mitte spalte" hidden>
+    <p class="gross">✓ Alle Erfassungen sind übertragen.</p>
+    <p id="fertig-text">Der Lauf ist abgeschlossen. Die Daten wurden von diesem iPad gelöscht.
+      Danke für deine Hilfe!</p>
+  </div>
+
+  <!-- Einrichtung: am Vortag im WLAN -->
+  <section id="einrichtung" class="vollbild einrichtung" hidden>
+    <h1 id="einrichtung-posten"></h1>
+    <p class="status-ok" id="einrichtung-status"></p>
+    <p class="status-offline" id="einrichtung-offline" aria-live="polite"></p>
+
+    <div class="anleitung" id="anleitung-installieren">
+      <h2>Einmal zum Home-Bildschirm hinzufügen</h2>
+      <p>Tippe oben auf <strong>Teilen</strong> (das Quadrat mit dem Pfeil)
+        und dann auf <strong>Zum Home-Bildschirm</strong>.</p>
+      <p>Öffne die App danach über das neue Symbol auf dem Home-Bildschirm.
+        Dann funktioniert sie auch ohne Internet.</p>
+    </div>
+
+    <div class="anleitung">
+      <h2>So geht’s an deinem Posten</h2>
+      <ol>
+        <li>Oben steht groß die Nummer des Kindes, das als Nächstes kommt.</li>
+        <li>Hat das Kind alles richtig gemacht: <strong>Weiter</strong> tippen. Fertig.</li>
+        <li>Hat es etwas vergessen: erst den Punkt antippen (wird rot), dann <strong>Weiter</strong>.</li>
+        <li>Kommt ein anderes Kind: <strong>andere Nummer</strong> tippen und die Nummer wählen.</li>
+        <li>Vertippt? Ein paar Sekunden lang erscheint <strong>Rückgängig</strong>.</li>
+      </ol>
+      <p>Darauf achtest du an diesem Posten:</p>
+      <ul id="einrichtung-items"></ul>
+    </div>
+
+    <button type="button" class="knopf knopf-haupt" id="start">Prüfung starten</button>
+    <p class="prototyp-hinweis" id="prototyp-hinweis" hidden>
+      Übungsmodus mit Beispieldaten. Es werden keine Daten übertragen.
+      <button type="button" class="knopf-klein" id="zuruecksetzen">Beispieldaten zurücksetzen</button>
+    </p>
+  </section>
+
+  <!-- Hauptansicht -->
+  <div id="haupt" class="vollbild haupt" hidden>
+    <header class="statusleiste">
+      <span class="statusleiste-posten" id="status-posten"></span>
+      <span class="statusleiste-zaehler" id="status-zaehler" aria-live="polite"></span>
+      <span class="statusleiste-netz" id="status-netz"></span>
+      <button type="button" class="statusleiste-knopf" id="uebertragen">Jetzt übertragen</button>
+    </header>
+
+    <nav class="reiter" role="tablist">
+      <button type="button" role="tab" class="reiter-knopf" id="reiter-erfassung" aria-selected="true">Erfassung</button>
+      <button type="button" role="tab" class="reiter-knopf" id="reiter-sicherheit" aria-selected="false">Fahrsicherheit</button>
+    </nav>
+
+    <main id="ansicht-erfassung" class="erfassung" role="tabpanel">
+      <div class="nummer-block">
+        <div class="nummer-zeile">
+          <span class="nummer-label">Nr.</span>
+          <span class="nummer" id="nummer"></span>
+        </div>
+        <div class="durchgang" id="durchgang"></div>
+      </div>
+
+      <!-- Platz ist immer reserviert, damit nichts unter dem Finger verrutscht -->
+      <div class="rueckgaengig" id="rueckgaengig" aria-live="polite">
+        <div class="rueckgaengig-inhalt" id="rueckgaengig-inhalt" hidden>
+          <span id="rueckgaengig-text"></span>
+          <button type="button" class="knopf knopf-rueckgaengig" id="rueckgaengig-knopf">Rückgängig</button>
+          <span class="rueckgaengig-balken" id="rueckgaengig-balken"></span>
+        </div>
+      </div>
+
+      <div class="items" id="items"></div>
+
+      <div class="aktionen">
+        <button type="button" class="knopf knopf-haupt knopf-weiter" id="weiter">Weiter</button>
+        <div class="neben">
+          <button type="button" class="knopf knopf-neben" id="andere-nummer">andere Nummer</button>
+          <button type="button" class="knopf knopf-neben" id="ueberspringen">überspringen</button>
+        </div>
+      </div>
+    </main>
+
+    <main id="ansicht-sicherheit" class="sicherheit" role="tabpanel" hidden>
+      <p class="hinweis">Tippe auf eine Nummer. Jedes Kind bekommt <strong>eine</strong> Einschätzung.
+        Du kannst sie jederzeit ändern.</p>
+      <div class="raster" id="sicherheit-raster"></div>
+    </main>
+  </div>
+
+  <!-- Raster „andere Nummer" -->
+  <div id="nummernwahl" class="dialog" hidden role="dialog" aria-modal="true" aria-labelledby="nummernwahl-titel">
+    <div class="dialog-kopf">
+      <h2 id="nummernwahl-titel">Welche Nummer kommt?</h2>
+      <button type="button" class="knopf knopf-neben" id="nummernwahl-abbrechen">Abbrechen</button>
+    </div>
+    <div class="raster" id="nummernwahl-raster"></div>
+  </div>
+
+  <!-- Fahrsicherheit für eine Nummer -->
+  <div id="bewertung" class="dialog" hidden role="dialog" aria-modal="true" aria-labelledby="bewertung-titel">
+    <div class="dialog-kopf">
+      <h2 id="bewertung-titel"></h2>
+      <button type="button" class="knopf knopf-neben" id="bewertung-fertig">Fertig</button>
+    </div>
+    <div class="stufen" id="bewertung-stufen"></div>
+    <label class="bemerkung-label" for="bewertung-bemerkung">Bemerkung (freiwillig, ohne Namen)</label>
+    <textarea id="bewertung-bemerkung" class="bemerkung" rows="3" maxlength="500"
+      autocomplete="off" autocorrect="on" spellcheck="false"></textarea>
+    <p class="bewertung-meldung" id="bewertung-meldung" aria-live="polite"></p>
+  </div>
+
+  <!-- Rückmeldung nach dem Speichern -->
+  <div id="blitz" class="blitz" aria-hidden="true"><span id="blitz-text"></span></div>
+
+</body>
+</html>

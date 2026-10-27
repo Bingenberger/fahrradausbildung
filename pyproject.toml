@@ -1,0 +1,34 @@
+[project]
+name = "fahrradpruefung"
+version = "0.1.0"
+description = "Begleitung der Radfahrausbildung an Grundschulen"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0.30",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "argon2-cffi>=23.1",
+    "pydantic-settings>=2.4",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "weasyprint>=70.0",
+    "segno>=1.6.6",
+    "pillow>=11",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+    "playwright>=1.64.0",
+    "pypdf>=6.20.1",
+    "pyzbar>=0.1.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]

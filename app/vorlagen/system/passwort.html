@@ -1,0 +1,12 @@
+{% extends "basis.html" %}
+{% block titel %}Startpasswort{% endblock %}
+{% block inhalt %}
+<section class="karte schmal">
+  <h1>Startpasswort</h1>
+  <p>Für <strong>{{ email }}</strong> ({{ schule.name }}):</p>
+  <p class="passwort"><code>{{ passwort }}</code></p>
+  <p class="hinweis">Dieses Passwort wird nur jetzt angezeigt. Gib es auf sicherem Weg weiter
+    und bitte darum, es nach der ersten Anmeldung unter „Konto“ zu ändern.</p>
+  <p><a href="/system/schulen/{{ schule.id }}" class="knopf">Zurück zur Schule</a></p>
+</section>
+{% endblock %}

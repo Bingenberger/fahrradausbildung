@@ -1,0 +1,40 @@
+{# Formular-Bausteine. Jedes POST-Formular trägt das CSRF-Token. #}
+
+{% macro csrf_feld() -%}
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+{%- endmacro %}
+
+{% macro knopf(action, text, klasse="knopf", felder={}) -%}
+  <form method="post" action="{{ action }}" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for k, v in felder.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <button type="submit" class="{{ klasse }}">{{ text }}</button>
+  </form>
+{%- endmacro %}
+
+{# Gefährliche Aktion mit Rückfrage – ohne JavaScript #}
+{% macro mit_rueckfrage(action, text, frage) -%}
+  <details class="rueckfrage">
+    <summary class="knopf knopf-gefahr-leise">{{ text }}</summary>
+    <div class="rueckfrage-inhalt">
+      <p>{{ frage }}</p>
+      <form method="post" action="{{ action }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="knopf knopf-gefahr">Ja, {{ text|lower }}</button>
+      </form>
+    </div>
+  </details>
+{%- endmacro %}
+
+{% macro verschieben(action, erster, letzter) -%}
+  <span class="verschieben">
+    <form method="post" action="{{ action }}" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="richtung" value="hoch">
+      <button type="submit" class="knopf knopf-klein" {% if erster %}disabled{% endif %} aria-label="nach oben">↑</button>
+    </form>
+    <form method="post" action="{{ action }}" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="richtung" value="runter">
+      <button type="submit" class="knopf knopf-klein" {% if letzter %}disabled{% endif %} aria-label="nach unten">↓</button>
+    </form>
+  </span>
+{%- endmacro %}

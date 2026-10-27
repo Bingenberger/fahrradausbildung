@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block titel %}Fahrradprüfung{% endblock %} – Fahrradprüfung</title>
+  <link rel="stylesheet" href="/static/verwaltung.css">
+  {% block kopf %}{% endblock %}
+</head>
+<body>
+  <header class="kopf">
+    <div class="kopf-innen">
+      <a class="marke" href="/">Fahrradprüfung</a>
+      {% if sitzung %}
+        <nav class="hauptnav" aria-label="Hauptnavigation">
+          {% if sitzung.rolle == "schuladmin" %}
+            <a href="/verwaltung/strecken" {% if request.url.path.startswith("/verwaltung/strecken") or request.url.path.startswith("/verwaltung/posten") %}aria-current="page"{% endif %}>Strecken</a>
+            <a href="/verwaltung/ablaeufe" {% if request.url.path.startswith("/verwaltung/ablaeufe") %}aria-current="page"{% endif %}>Abläufe</a>
+            <a href="/verwaltung/gruppen" {% if request.url.path.startswith("/verwaltung/gruppen") %}aria-current="page"{% endif %}>Gruppen</a>
+            <a href="/verwaltung/laeufe" {% if request.url.path.startswith("/verwaltung/laeufe") %}aria-current="page"{% endif %}>Läufe</a>
+          {% else %}
+            <a href="/system" {% if request.url.path.startswith("/system/schulen") or request.url.path == "/system" %}aria-current="page"{% endif %}>Schulen</a>
+          {% endif %}
+        </nav>
+        <div class="konto">
+          <span class="konto-name">{{ sitzung.schule_name or "Systemverwaltung" }}</span>
+          <a href="{{ '/verwaltung/konto' if sitzung.rolle == 'schuladmin' else '/system/konto' }}">Konto</a>
+          <form method="post" action="/abmelden">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="link-knopf">Abmelden</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="{% block hauptklasse %}inhalt{% endblock %}">
+    {% for m in meldungen %}
+      <p class="meldung meldung-{{ m.art }}" role="{{ 'alert' if m.art == 'fehler' else 'status' }}">{{ m.text }}</p>
+    {% endfor %}
+    {% block inhalt %}{% endblock %}
+  </main>
+</body>
+</html>

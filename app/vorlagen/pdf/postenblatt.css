@@ -1,0 +1,54 @@
+/* Posten-Blatt: eine A4-Seite je Posten. Austauschbar je Schule. */
+
+@page { size: A4; margin: 14mm 16mm 14mm 16mm; }
+
+body { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; font-size: 10.5pt; color: #000; line-height: 1.35; }
+
+.blatt { page-break-after: always; }
+.blatt:last-child { page-break-after: auto; }
+
+.kopf { display: flex; justify-content: space-between; font-size: 9pt; border-bottom: 1px solid #000; padding-bottom: 2mm; }
+
+.postennummer { margin: 6mm 0 0; font-size: 12pt; }
+h1 { font-size: 22pt; margin: 1mm 0 2mm; line-height: 1.15; }
+h2 { font-size: 12.5pt; margin: 6mm 0 2mm; }
+.beschreibung { margin: 0 0 2mm; }
+
+.einrichtung { display: flex; gap: 6mm; align-items: flex-start; border: 1.5pt solid #000; border-radius: 3mm; padding: 4mm; margin-top: 4mm; }
+.einrichtung h2 { margin-top: 0; }
+.einrichtung ol { margin: 0; padding-left: 5mm; }
+.qr { width: 52mm; height: 52mm; flex: 0 0 52mm; }
+.url { font-family: "DejaVu Sans Mono", monospace; font-size: 7.5pt; word-break: break-all; color: #333; margin: 3mm 0 0; }
+
+.items { width: 100%; border-collapse: collapse; }
+.items th, .items td { text-align: left; vertical-align: top; padding: 2mm 2mm; border-bottom: 0.5pt solid #777; }
+.items th { width: 45mm; font-size: 11.5pt; }
+
+.bedienung { margin: 0; padding-left: 5mm; }
+.bedienung li { margin: 0.5mm 0; }
+
+.hinweisfeld {
+  height: 32mm;
+  border: 0.75pt solid #000;
+  border-radius: 2mm;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 7.5mm, #bbb 7.5mm, #bbb 7.75mm);
+}
+
+.fuss { margin-top: 4mm; font-size: 8.5pt; color: #333; }
+
+/* Mit Kartenausschnitt: alles etwas knapper, damit das Blatt eine Seite bleibt. */
+.standort { margin: 1.5mm 0 0; }
+.standort img { display: block; width: 100%; height: 40mm; object-fit: cover; border: 0.75pt solid #000; border-radius: 2mm; }
+.standort figcaption { font-size: 8pt; color: #333; margin-top: 0.8mm; }
+.mit-karte .postennummer { margin-top: 3mm; }
+.mit-karte h1 { font-size: 19pt; margin-bottom: 1mm; }
+.mit-karte h2 { margin: 3.5mm 0 1.5mm; }
+.mit-karte .einrichtung { padding: 3mm; margin-top: 3mm; }
+.mit-karte .qr { width: 36mm; height: 36mm; flex-basis: 36mm; }
+.mit-karte .items th, .mit-karte .items td { padding: 1.2mm 2mm; }
+.mit-karte .hinweisfeld { height: 14mm; }
+.mit-karte .fuss { margin-top: 2.5mm; }
+.mit-karte { font-size: 10pt; }
+.mit-karte .beschreibung { margin-bottom: 1mm; }
+.mit-karte .bedienung li { margin: 0; }
+.mit-karte .fuss { font-size: 8pt; }

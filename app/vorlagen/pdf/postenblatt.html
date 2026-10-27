@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Posten-Blätter {{ lauf.datum|datum }}</title>
+</head>
+<body>
+{% for b in blaetter %}
+<section class="blatt{% if b.karte %} mit-karte{% endif %}">
+  <header class="kopf">
+    <div>{{ schule_name }}</div>
+    <div>Radfahrprüfung · {{ lauf.datum|datum_lang }}</div>
+  </header>
+
+  <p class="postennummer">Posten {{ b.nummer }} von {{ b.anzahl }}</p>
+  <h1>{{ b.posten.name }}</h1>
+  {% if b.posten.beschreibung %}<p class="beschreibung">{{ b.posten.beschreibung }}</p>{% endif %}
+  {% if b.karte %}
+    <figure class="standort">
+      <img src="{{ b.karte }}" alt="Kartenausschnitt mit dem Standort des Postens">
+      <figcaption>Dein Standort: der gelbe Punkt {{ b.nummer }}. Rot: die Strecke der Kinder.</figcaption>
+    </figure>
+  {% endif %}
+
+  <div class="einrichtung">
+    <img class="qr" src="{{ b.qr }}" alt="QR-Code zum Posten">
+    <div>
+      <h2>Am Vortag einrichten (im WLAN)</h2>
+      <ol>
+        <li>Mit der Kamera des iPads den QR-Code scannen und den Link öffnen.</li>
+        <li>Warten, bis „offline einsatzbereit“ erscheint.</li>
+        <li>Auf <strong>Teilen</strong> tippen, dann <strong>Zum Home-Bildschirm</strong>.</li>
+        <li>Die App ab jetzt nur noch über das neue Symbol öffnen.</li>
+      </ol>
+      <p class="url">{{ b.url }}</p>
+    </div>
+  </div>
+
+  <h2>Darauf achtest du an diesem Posten</h2>
+  <table class="items">
+    {% for i in b.posten.items %}
+      <tr>
+        <th>{{ i.kurzbezeichnung }}</th>
+        <td>{{ i.beobachtungstext }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <h2>So erfasst du</h2>
+  <ul class="bedienung">
+    <li>Oben steht groß die Nummer des Kindes, das als Nächstes kommt.</li>
+    <li>Alles richtig gemacht: <strong>Weiter</strong> tippen.</li>
+    <li>Etwas vergessen: den Punkt antippen (wird rot), dann <strong>Weiter</strong>.</li>
+    <li>Ein anderes Kind kommt: <strong>andere Nummer</strong>. Vertippt: <strong>Rückgängig</strong>.</li>
+    <li>Zum Reiter <strong>Fahrsicherheit</strong>: jedem Kind einmal sicher / teilweise sicher / unsicher geben.</li>
+    <li>Achte immer zuerst auf den Verkehr. Ein verpasstes Kind ist kein Problem.</li>
+  </ul>
+
+  <h2>Hinweise</h2>
+  <div class="hinweisfeld"></div>
+
+  <footer class="fuss">
+    Bitte gib dieses Blatt nach der Prüfung zusammen mit dem iPad zurück –
+    der QR-Code ist der Zugang zu diesem Posten. Das iPad erst nach der Rückgabe ins WLAN bringen.
+  </footer>
+</section>
+{% endfor %}
+</body>
+</html>

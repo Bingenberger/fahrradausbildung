@@ -1,0 +1,95 @@
+{#-
+  Feedbackbogen – eine A4-Seite je Kind.
+
+  Diese Datei darf eine Schule austauschen (Logo, Fußzeile, Formulierungen).
+  Wie das geht, steht im README unter „Feedbackbogen anpassen".
+
+  Verfügbar:
+    schule.name, schule.kurzname       lauf.datum (Filter: datum, datum_lang)
+    logo   – Adresse des Logos oder leer
+    boegen – Liste, je Kind:
+      b.kind.startnummer        (Namen kennt die Anwendung nicht – die Lehrkraft trägt ihn ein)
+      b.feedback.gut           Liste von Kurzbezeichnungen (Fehlerquote unter 25 %)
+      b.feedback.ueben         höchstens drei Einträge mit .kurzbezeichnung und .uebungstext
+      b.feedback.sicherheit    "sicher" | "ueberwiegend_sicher" | "teilweise_unsicher" | "unsicher" | none
+      b.feedback.hat_daten     false, wenn kein Posten das Kind erfasst hat
+
+  Keine Zahlen, Prozente oder Noten auf den Bogen – er ist für ein Kind und seine Eltern.
+-#}
+{%- set sicherheit_satz = {
+  "sicher": "Die Streckenposten fanden, dass du schon sicher Rad fährst – weiter so!",
+  "ueberwiegend_sicher": "Die Streckenposten fanden, dass du meistens schon sicher fährst und an manchen Stellen noch etwas Übung brauchst.",
+  "teilweise_unsicher": "Die Streckenposten fanden, dass du an manchen Stellen noch unsicher fährst – übe dort am besten zusammen mit deinen Eltern.",
+  "unsicher": "Die Streckenposten fanden, dass du beim Radfahren noch unsicher bist – übe am besten erst auf ruhigen Wegen zusammen mit deinen Eltern.",
+} -%}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Feedbackbogen Radfahrprüfung</title>
+</head>
+<body>
+{% for b in boegen %}
+<article class="bogen">
+  <header class="kopf">
+    <div class="kopf-links">
+      {% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}
+      <span class="schule">{{ schule.name }}</span>
+    </div>
+    <span class="datum">{{ lauf.datum|datum_lang }}</span>
+  </header>
+
+  <h1>Deine Radfahrprüfung</h1>
+  <div class="wer">
+    <span class="startnummer">Startnummer {{ b.kind.startnummer }}</span>
+    <span class="namensfeld">Name:</span>
+  </div>
+
+  {% if b.feedback.hat_daten %}
+    <p class="einleitung">Hallo, bei der Radfahrprüfung haben die Streckenposten genau
+      hingeschaut – hier steht, was du schon gut kannst und was du noch üben kannst.</p>
+
+    <section class="abschnitt gut">
+      <h2>Das klappt schon gut</h2>
+      {% if b.feedback.gut %}
+        <ul{% if b.feedback.gut|length > 5 %} class="zweispaltig"{% endif %}>
+          {% for text in b.feedback.gut %}<li>{{ text }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <p>Du hast die ganze Strecke mitgemacht. Jetzt geht es ans Üben – das schaffst du!</p>
+      {% endif %}
+    </section>
+
+    {% if b.feedback.ueben %}
+      <section class="abschnitt ueben">
+        <h2>Daran üben wir noch</h2>
+        <ol>
+          {% for u in b.feedback.ueben %}
+            <li><strong>{{ u.kurzbezeichnung }}:</strong>
+              {{ u.uebungstext or "Achte darauf beim nächsten Mal ganz besonders." }}</li>
+          {% endfor %}
+        </ol>
+      </section>
+    {% endif %}
+
+    {% if b.feedback.sicherheit %}
+      <section class="abschnitt sicherheit">
+        <h2>So sicher fährst du</h2>
+        <p>{{ sicherheit_satz[b.feedback.sicherheit] }}</p>
+      </section>
+    {% endif %}
+  {% else %}
+    <p class="einleitung">Hallo, zu deiner Fahrt haben die Streckenposten leider
+      nichts aufgeschrieben. Deine Lehrerin oder dein Lehrer erzählt dir, wie es gelaufen ist.</p>
+  {% endif %}
+
+  <section class="abschnitt lehrkraft">
+    <h2>Das möchte ich dir noch sagen</h2>
+    <div class="schreibfeld">{% for _ in range(12) %}<div class="linie"></div>{% endfor %}</div>
+  </section>
+
+  <footer class="fuss">{{ schule.name }} · Radfahrausbildung Klasse 4</footer>
+</article>
+{% endfor %}
+</body>
+</html>

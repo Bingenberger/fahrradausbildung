@@ -1,0 +1,46 @@
+{% extends "basis.html" %}
+{% from "_makros.html" import csrf_feld, knopf with context %}
+{% block titel %}Abläufe{% endblock %}
+{% block inhalt %}
+<h1>Abläufe</h1>
+<p class="hilfe">Häufige Handlungsabläufe wie „Linksabbiegen“ einmal anlegen und dann mit einem Klick in
+  Posten einfügen. Die Schritte werden dabei kopiert: Spätere Änderungen hier wirken sich nicht auf
+  vorhandene Posten aus.</p>
+
+<section class="karte">
+  {% if ablaeufe %}
+    <table class="tabelle">
+      <thead><tr><th>Ablauf</th><th>Schritte</th></tr></thead>
+      <tbody>
+        {% for a in ablaeufe %}
+          <tr>
+            <td><a href="/verwaltung/ablaeufe/{{ a.id }}">{{ a.name }}</a>
+              {% if a.beschreibung %}<div class="hilfe">{{ a.beschreibung }}</div>{% endif %}</td>
+            <td>{{ a.schritte|map(attribute="kurzbezeichnung")|join(" · ") or "–" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Noch keine Abläufe angelegt.</p>
+  {% endif %}
+
+  {% if fehlende_beispiele %}
+    <h2>Beispiele übernehmen</h2>
+    <p class="hilfe">Vorschläge für {{ fehlende_beispiele|join(", ") }} – mit Beobachtungs- und Übungstexten.
+      Bitte nach dem Übernehmen an eure Ausbildung anpassen.</p>
+    {{ knopf("/verwaltung/ablaeufe/beispiele", "Beispielabläufe übernehmen") }}
+  {% endif %}
+</section>
+
+<section class="karte">
+  <h2>Neuer Ablauf</h2>
+  <form method="post" action="/verwaltung/ablaeufe/neu" class="formular">
+    {{ csrf_feld() }}
+    <label>Name <input type="text" name="name" maxlength="200" required placeholder="z. B. Linksabbiegen"></label>
+    <label>Beschreibung <span class="hilfe">freiwillig</span> <textarea name="beschreibung" rows="2"></textarea></label>
+    <button type="submit" class="knopf knopf-haupt">Ablauf anlegen</button>
+  </form>
+  <p class="hilfe">Oder auf einem fertigen Posten „Als Ablauf speichern“ wählen.</p>
+</section>
+{% endblock %}

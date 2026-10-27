@@ -1,0 +1,73 @@
+{% extends "basis.html" %}
+{% from "_makros.html" import csrf_feld, knopf, mit_rueckfrage with context %}
+{% block titel %}{{ gruppe.name }}{% endblock %}
+{% block inhalt %}
+<p class="brotkrumen"><a href="/verwaltung/gruppen">Gruppen</a> ›</p>
+<h1>{{ gruppe.name }} <span class="hilfe">{{ gruppe.schuljahr }}</span>
+  {% if gruppe.archiviert %}<span class="marke-archiv">archiviert</span>{% endif %}</h1>
+
+{% if startnummern_fest %}
+  <p class="hinweis">Diese Gruppe hat bereits einen Lauf. Die Startnummern sind deshalb fest und lassen
+    sich nur deaktivieren, nicht löschen.</p>
+{% endif %}
+
+<section class="karte" id="kinder">
+  <h2>Startnummern ({{ kinder|selectattr("aktiv")|list|length }} aktiv)</h2>
+  <p class="hilfe">Die Anwendung speichert keine Namen. Drucke die Namensliste aus und trage die Namen von Hand ein.
+    Die Liste bleibt bei der Klassenleitung – und jedes Kind bekommt bei jedem Lauf dieselbe Nummer.</p>
+  {% if kinder %}
+    <p><a class="knopf knopf-haupt" href="/verwaltung/gruppen/{{ gruppe.id }}/namensliste.pdf">Namensliste drucken (PDF)</a></p>
+    <ul class="nummern-liste">
+      {% for k in kinder %}
+        <li class="nummer-eintrag {% if not k.aktiv %}archiviert{% endif %}" id="kind-{{ k.id }}">
+          <span class="nummer-gross">{{ k.startnummer }}</span>
+          {% if not k.aktiv %}<span class="leise">inaktiv</span>{% endif %}
+          <div class="aktionsleiste">
+            {% if k.aktiv %}
+              {{ knopf("/verwaltung/kinder/%d/deaktivieren"|format(k.id), "Deaktivieren", "knopf knopf-klein") }}
+            {% else %}
+              {{ knopf("/verwaltung/kinder/%d/aktivieren"|format(k.id), "Aktivieren", "knopf knopf-klein") }}
+            {% endif %}
+            {% if not startnummern_fest %}
+              {{ mit_rueckfrage("/verwaltung/kinder/%d/loeschen"|format(k.id), "Löschen", "Diese Startnummer wird aus der Gruppe gelöscht.") }}
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Diese Gruppe hat noch keine Startnummern.</p>
+  {% endif %}
+
+  <h3>Startnummern hinzufügen</h3>
+  <form method="post" action="/verwaltung/gruppen/{{ gruppe.id }}/kinder" class="formular formular-reihe">
+    {{ csrf_feld() }}
+    <label>von <input type="number" name="von" min="1" max="999" required></label>
+    <label>bis <input type="number" name="bis" min="1" max="999" placeholder="leer = nur eine Nummer"></label>
+    <button type="submit" class="knopf">Hinzufügen</button>
+  </form>
+  <p class="hilfe">Vorhandene Nummern werden übersprungen. Ein Kind kommt neu dazu: einfach die nächste freie Nummer anlegen
+    und auf der Papierliste ergänzen. Ein Kind fehlt dauerhaft: Nummer deaktivieren.</p>
+</section>
+
+<section class="karte">
+  <h2>Gruppe bearbeiten</h2>
+  <form method="post" action="/verwaltung/gruppen/{{ gruppe.id }}/bearbeiten" class="formular formular-reihe">
+    {{ csrf_feld() }}
+    <label>Name <input type="text" name="name" value="{{ gruppe.name }}" maxlength="200" required></label>
+    <label>Schuljahr <input type="text" name="schuljahr" value="{{ gruppe.schuljahr }}" maxlength="20" required></label>
+    <button type="submit" class="knopf">Speichern</button>
+  </form>
+  <div class="aktionsleiste">
+    {% if gruppe.archiviert %}
+      {{ knopf("/verwaltung/gruppen/%d/reaktivieren"|format(gruppe.id), "Wieder aktivieren") }}
+    {% else %}
+      {{ knopf("/verwaltung/gruppen/%d/archivieren"|format(gruppe.id), "Archivieren") }}
+    {% endif %}
+    {% if not startnummern_fest %}
+      {{ mit_rueckfrage("/verwaltung/gruppen/%d/loeschen"|format(gruppe.id), "Löschen",
+         "Die Gruppe wird mit allen Startnummern endgültig gelöscht.") }}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "basis.html" %}
+{% from "_makros.html" import csrf_feld with context %}
+{% block titel %}Läufe{% endblock %}
+{% block inhalt %}
+<h1>Läufe</h1>
+
+<section class="karte">
+  <h2>Neuer Lauf</h2>
+  {% if strecken and gruppen %}
+    <form method="post" action="/verwaltung/laeufe/neu" class="formular formular-reihe">
+      {{ csrf_feld() }}
+      <label>Gruppe
+        <select name="gruppe_id" required>
+          {% for g in gruppen %}<option value="{{ g.id }}">{{ g.name }} ({{ g.schuljahr }})</option>{% endfor %}
+        </select>
+      </label>
+      <label>Strecke
+        <select name="strecke_id" required>
+          {% for s in strecken %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Datum <input type="date" name="datum" min="{{ heute }}" required></label>
+      <button type="submit" class="knopf knopf-haupt">Lauf anlegen</button>
+    </form>
+    <p class="hilfe">Für jeden Posten der Strecke entsteht ein eigener Zugang (QR-Code auf dem Posten-Blatt).</p>
+  {% else %}
+    <p>Lege zuerst eine <a href="/verwaltung/strecken">Strecke</a> und eine <a href="/verwaltung/gruppen">Gruppe</a> an.</p>
+  {% endif %}
+</section>
+
+<section class="karte">
+  {% if laeufe %}
+    <table class="tabelle">
+      <thead><tr><th>Datum</th><th>Gruppe</th><th>Strecke</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for l in laeufe %}
+          <tr {% if l.status == "archiviert" %}class="archiviert"{% endif %}>
+            <td><a href="/verwaltung/laeufe/{{ l.id }}">{{ l.datum|datum }}</a></td>
+            <td>{{ l.gruppe.name }}</td>
+            <td>{{ l.strecke.name }}</td>
+            <td><span class="status status-{{ l.status }}">{{ status_text[l.status] }}</span></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Noch kein Lauf angelegt.</p>
+  {% endif %}
+</section>
+{% endblock %}

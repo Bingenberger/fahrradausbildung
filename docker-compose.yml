@@ -1,0 +1,48 @@
+# Fahrradprüfung – Betrieb mit Docker Compose.
+#
+#   cp .env.example .env      # Werte anpassen, vor allem POSTGRES_PASSWORD und FP_OEFFENTLICHE_URL
+#   docker compose up -d --build
+#   docker compose exec app python -m app.kommandos systemadmin-anlegen admin@example.org
+#
+# Die App lauscht nur auf 127.0.0.1 – davor gehört nginx mit HTTPS
+# (Beispiel: deploy/nginx-fahrradpruefung.conf). Details: DEPLOYMENT.md.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fahrrad
+      POSTGRES_USER: fahrrad
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fahrrad -d fahrrad"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: fahrradpruefung:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Überschreibt den Wert aus .env: Im Compose-Netz heißt die Datenbank „db".
+      FP_DATABASE_URL: postgresql+psycopg://fahrrad:${POSTGRES_PASSWORD}@db:5432/fahrrad
+      FP_VORLAGEN_VERZEICHNIS: /vorlagen
+      # X-Forwarded-For nur von nginx glauben. „*" ist hier unbedenklich, weil der
+      # Port ausschließlich auf 127.0.0.1 veröffentlicht ist (siehe ports).
+      FORWARDED_ALLOW_IPS: "*"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FP_PORT:-8000}:8000"
+    volumes:
+      # Eigene Feedbackbogen-Vorlagen und Logos je Schule (README: „Feedbackbogen anpassen").
+      - ./vorlagen:/vorlagen:ro
+
+volumes:
+  pgdata:

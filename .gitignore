@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+
+# Eigene Vorlagen (außer der Erklärung)
+vorlagen/*
+!vorlagen/LIESMICH.txt

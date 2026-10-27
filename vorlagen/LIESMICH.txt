@@ -1,0 +1,2 @@
+Eigene Feedbackbogen-Vorlagen und Logos. Aufbau und Beispiele: README.md, Abschnitt
+„Feedbackbogen anpassen". Unter Docker Compose ist dieser Ordner als /vorlagen eingebunden.

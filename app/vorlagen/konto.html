@@ -1,0 +1,32 @@
+{% extends "basis.html" %}
+{% from "_makros.html" import csrf_feld with context %}
+{% block titel %}Konto{% endblock %}
+{% block inhalt %}
+<h1>Konto</h1>
+<section class="karte schmal">
+  <p>Angemeldet als <strong>{{ sitzung.email }}</strong></p>
+  <h2>Passwort ändern</h2>
+  <form method="post" action="{{ basis }}/konto/passwort" class="formular">
+    {{ csrf_feld() }}
+    <label>Bisheriges Passwort
+      <input type="password" name="alt" autocomplete="current-password" required>
+    </label>
+    <label>Neues Passwort <span class="hilfe">mindestens 10 Zeichen</span>
+      <input type="password" name="neu" autocomplete="new-password" minlength="10" required>
+    </label>
+    <label>Neues Passwort wiederholen
+      <input type="password" name="neu2" autocomplete="new-password" minlength="10" required>
+    </label>
+    <button type="submit" class="knopf knopf-haupt">Passwort ändern</button>
+  </form>
+</section>
+{% if basis == "/verwaltung" %}
+<section class="karte schmal">
+  <h2>Datenexport</h2>
+  <p>Alle Daten deiner Schule als JSON-Datei: Strecken, Gruppen mit Startnummern, Läufe und alle Erfassungen.
+    Für Auskunftsersuchen nach der DSGVO oder zur Sicherung.</p>
+  <p class="hilfe">Die Datei enthält keine Namen von Kindern, nur Startnummern – aber die E-Mail-Adressen der Schuladmins.</p>
+  <p><a class="knopf" href="/verwaltung/export.json">Export herunterladen</a></p>
+</section>
+{% endif %}
+{% endblock %}

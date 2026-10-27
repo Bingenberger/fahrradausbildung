@@ -1,0 +1,103 @@
+{% extends "basis.html" %}
+{% from "_makros.html" import csrf_feld, mit_rueckfrage, verschieben with context %}
+{% block titel %}{{ posten.name }}{% endblock %}
+{% block inhalt %}
+<p class="brotkrumen"><a href="/verwaltung/strecken">Strecken</a> ›
+  <a href="/verwaltung/strecken/{{ strecke.id }}">{{ strecke.name }}</a> ›</p>
+<h1>{{ posten.name }}</h1>
+
+<section class="karte">
+  <h2>Handlungsschritte (Items)</h2>
+  <p class="hilfe">Jedes Item hat drei Texte: die <strong>Kurzbezeichnung</strong> steht auf dem Knopf am iPad,
+    der <strong>Beobachtungstext</strong> sagt den Eltern am Posten, worauf sie achten sollen,
+    der <strong>Übungstext</strong> erscheint im Feedbackbogen für Kind und Eltern.</p>
+
+  {% for i in posten.items %}
+    <article class="item-karte" id="item-{{ i.id }}">
+      <div class="zeile">
+        <h3>{{ loop.index }}. {{ i.kurzbezeichnung }}</h3>
+        {% if not struktur_fest %}{{ verschieben("/verwaltung/items/%d/verschieben"|format(i.id), loop.first, loop.last) }}{% endif %}
+      </div>
+      <form method="post" action="/verwaltung/items/{{ i.id }}/bearbeiten" class="formular">
+        {{ csrf_feld() }}
+        <label>Kurzbezeichnung <span class="hilfe">auf dem Knopf, höchstens 40 Zeichen</span>
+          <input type="text" name="kurzbezeichnung" value="{{ i.kurzbezeichnung }}" maxlength="40" required></label>
+        <label>Beobachtungstext <span class="hilfe">für die Eltern am Posten</span>
+          <textarea name="beobachtungstext" rows="2">{{ i.beobachtungstext }}</textarea></label>
+        <label>Übungstext <span class="hilfe">für den Feedbackbogen, an das Kind gerichtet</span>
+          <textarea name="uebungstext" rows="2">{{ i.uebungstext }}</textarea></label>
+        <div class="aktionsleiste">
+          <button type="submit" class="knopf">Speichern</button>
+          {% if not struktur_fest %}
+            {{ mit_rueckfrage("/verwaltung/items/%d/loeschen"|format(i.id), "Löschen", "Dieses Item wird endgültig gelöscht.") }}
+          {% endif %}
+        </div>
+      </form>
+    </article>
+  {% else %}
+    <p>Dieser Posten hat noch keine Items.</p>
+  {% endfor %}
+
+  {% if not struktur_fest %}
+    <h3>Ablauf einfügen</h3>
+    {% if ablaeufe %}
+      <form method="post" action="/verwaltung/posten/{{ posten.id }}/ablauf-einfuegen" class="formular formular-reihe">
+        {{ csrf_feld() }}
+        <label>Ablauf
+          <select name="ablauf_id" required>
+            {% for a in ablaeufe %}<option value="{{ a.id }}">{{ a.name }} ({{ a.schritte|length }} Schritte)</option>{% endfor %}
+          </select></label>
+        <button type="submit" class="knopf">Einfügen</button>
+      </form>
+      <p class="hilfe">Die Schritte werden als Items ans Ende kopiert und lassen sich danach hier anpassen oder löschen.
+        Schritte, die der Posten schon hat, werden übersprungen.
+        <a href="/verwaltung/ablaeufe">Abläufe verwalten</a></p>
+    {% else %}
+      <p class="hilfe">Häufige Handlungsabläufe wie „Linksabbiegen“ lassen sich unter
+        <a href="/verwaltung/ablaeufe">Abläufe</a> einmal anlegen und dann hier mit einem Klick einfügen.</p>
+    {% endif %}
+
+    <h3>Item hinzufügen</h3>
+    <form method="post" action="/verwaltung/posten/{{ posten.id }}/items" class="formular">
+      {{ csrf_feld() }}
+      <label>Kurzbezeichnung <span class="hilfe">auf dem Knopf, höchstens 40 Zeichen</span>
+        <input type="text" name="kurzbezeichnung" maxlength="40" required placeholder="z. B. Schulterblick"></label>
+      <label>Beobachtungstext <span class="hilfe">für die Eltern am Posten</span>
+        <textarea name="beobachtungstext" rows="2" placeholder="z. B. Dreht das Kind vor dem Abbiegen den Kopf nach hinten links?"></textarea></label>
+      <label>Übungstext <span class="hilfe">für den Feedbackbogen</span>
+        <textarea name="uebungstext" rows="2" placeholder="z. B. Übe den Schulterblick, bevor du abbiegst."></textarea></label>
+      <button type="submit" class="knopf">Item hinzufügen</button>
+    </form>
+  {% else %}
+    <p class="hinweis">An der Strecke hängen bereits Läufe – Items lassen sich nur noch textlich bearbeiten.</p>
+  {% endif %}
+</section>
+
+{% if posten.items %}
+<section class="karte">
+  <h2>Als Ablauf speichern</h2>
+  <p class="hilfe">Die Items dieses Postens als wiederverwendbaren Ablauf speichern – zum Einfügen in andere Posten.</p>
+  <form method="post" action="/verwaltung/posten/{{ posten.id }}/als-ablauf" class="formular formular-reihe">
+    {{ csrf_feld() }}
+    <label>Name des Ablaufs <input type="text" name="name" maxlength="200" required placeholder="z. B. Linksabbiegen"></label>
+    <button type="submit" class="knopf">Als Ablauf speichern</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="karte">
+  <h2>Posten bearbeiten</h2>
+  <form method="post" action="/verwaltung/posten/{{ posten.id }}/bearbeiten" class="formular">
+    {{ csrf_feld() }}
+    <label>Name <input type="text" name="name" value="{{ posten.name }}" maxlength="200" required></label>
+    <label>Beschreibung <textarea name="beschreibung" rows="2">{{ posten.beschreibung }}</textarea></label>
+    <button type="submit" class="knopf">Speichern</button>
+  </form>
+  {% if not struktur_fest %}
+    <div class="aktionsleiste">
+      {{ mit_rueckfrage("/verwaltung/posten/%d/loeschen"|format(posten.id), "Posten löschen",
+         "Der Posten wird mit allen Items endgültig gelöscht.") }}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

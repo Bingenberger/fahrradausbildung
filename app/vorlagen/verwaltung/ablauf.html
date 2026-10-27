@@ -1,0 +1,64 @@
+{% extends "basis.html" %}
+{% from "_makros.html" import csrf_feld, mit_rueckfrage, verschieben with context %}
+{% block titel %}{{ ablauf.name }}{% endblock %}
+{% block inhalt %}
+<p class="brotkrumen"><a href="/verwaltung/ablaeufe">Abläufe</a> ›</p>
+<h1>{{ ablauf.name }}</h1>
+
+<section class="karte">
+  <h2>Handlungsschritte</h2>
+  <p class="hilfe">Wie bei den Items eines Postens: Die <strong>Kurzbezeichnung</strong> steht auf dem Knopf am iPad,
+    der <strong>Beobachtungstext</strong> sagt den Eltern, worauf sie achten sollen,
+    der <strong>Übungstext</strong> erscheint im Feedbackbogen.</p>
+
+  {% for s in ablauf.schritte %}
+    <article class="item-karte" id="schritt-{{ s.id }}">
+      <div class="zeile">
+        <h3>{{ loop.index }}. {{ s.kurzbezeichnung }}</h3>
+        {{ verschieben("/verwaltung/ablaufschritte/%d/verschieben"|format(s.id), loop.first, loop.last) }}
+      </div>
+      <form method="post" action="/verwaltung/ablaufschritte/{{ s.id }}/bearbeiten" class="formular">
+        {{ csrf_feld() }}
+        <label>Kurzbezeichnung <span class="hilfe">auf dem Knopf, höchstens 40 Zeichen</span>
+          <input type="text" name="kurzbezeichnung" value="{{ s.kurzbezeichnung }}" maxlength="40" required></label>
+        <label>Beobachtungstext <span class="hilfe">für die Eltern am Posten</span>
+          <textarea name="beobachtungstext" rows="2">{{ s.beobachtungstext }}</textarea></label>
+        <label>Übungstext <span class="hilfe">für den Feedbackbogen, an das Kind gerichtet</span>
+          <textarea name="uebungstext" rows="2">{{ s.uebungstext }}</textarea></label>
+        <div class="aktionsleiste">
+          <button type="submit" class="knopf">Speichern</button>
+          {{ mit_rueckfrage("/verwaltung/ablaufschritte/%d/loeschen"|format(s.id), "Löschen", "Dieser Schritt wird aus dem Ablauf gelöscht.") }}
+        </div>
+      </form>
+    </article>
+  {% else %}
+    <p>Dieser Ablauf hat noch keine Schritte.</p>
+  {% endfor %}
+
+  <h3>Schritt hinzufügen</h3>
+  <form method="post" action="/verwaltung/ablaeufe/{{ ablauf.id }}/schritte" class="formular">
+    {{ csrf_feld() }}
+    <label>Kurzbezeichnung <span class="hilfe">auf dem Knopf, höchstens 40 Zeichen</span>
+      <input type="text" name="kurzbezeichnung" maxlength="40" required placeholder="z. B. Schulterblick links"></label>
+    <label>Beobachtungstext <span class="hilfe">für die Eltern am Posten</span>
+      <textarea name="beobachtungstext" rows="2"></textarea></label>
+    <label>Übungstext <span class="hilfe">für den Feedbackbogen</span>
+      <textarea name="uebungstext" rows="2"></textarea></label>
+    <button type="submit" class="knopf">Schritt hinzufügen</button>
+  </form>
+</section>
+
+<section class="karte">
+  <h2>Ablauf bearbeiten</h2>
+  <form method="post" action="/verwaltung/ablaeufe/{{ ablauf.id }}/bearbeiten" class="formular">
+    {{ csrf_feld() }}
+    <label>Name <input type="text" name="name" value="{{ ablauf.name }}" maxlength="200" required></label>
+    <label>Beschreibung <textarea name="beschreibung" rows="2">{{ ablauf.beschreibung }}</textarea></label>
+    <button type="submit" class="knopf">Speichern</button>
+  </form>
+  <div class="aktionsleiste">
+    {{ mit_rueckfrage("/verwaltung/ablaeufe/%d/loeschen"|format(ablauf.id), "Ablauf löschen",
+       "Der Ablauf wird gelöscht. Posten, in die er schon eingefügt wurde, behalten ihre Items.") }}
+  </div>
+</section>
+{% endblock %}

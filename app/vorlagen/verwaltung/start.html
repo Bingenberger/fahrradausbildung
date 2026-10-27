@@ -1,0 +1,52 @@
+{% extends "basis.html" %}
+{% block titel %}Übersicht{% endblock %}
+{% block inhalt %}
+<h1>{{ sitzung.schule_name }}</h1>
+
+<section class="karte">
+  <h2>Anstehende Läufe</h2>
+  {% if laeufe %}
+    <ul class="liste">
+      {% for l in laeufe %}
+        <li><a href="/verwaltung/laeufe/{{ l.id }}">{{ l.datum|datum_lang }}</a>
+          <span class="hilfe">{{ l.gruppe.name }} · {{ l.strecke.name }}</span></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Kein Lauf geplant.</p>
+  {% endif %}
+  <p><a href="/verwaltung/laeufe">Alle Läufe</a></p>
+</section>
+
+<div class="spalten">
+  <section class="karte">
+    <h2>Strecken</h2>
+    {% if strecken %}
+      <ul class="liste">
+        {% for s in strecken %}
+          <li><a href="/verwaltung/strecken/{{ s.id }}">{{ s.name }}</a>
+            <span class="hilfe">{{ s.posten|length }} Posten</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Noch keine Strecke angelegt.</p>
+    {% endif %}
+    <p><a href="/verwaltung/strecken">Alle Strecken verwalten</a></p>
+  </section>
+
+  <section class="karte">
+    <h2>Gruppen</h2>
+    {% if gruppen %}
+      <ul class="liste">
+        {% for g in gruppen %}
+          <li><a href="/verwaltung/gruppen/{{ g.id }}">{{ g.name }}</a>
+            <span class="hilfe">{{ g.schuljahr }} · {{ anzahl.get(g.id, 0) }} Kinder</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Noch keine Gruppe angelegt.</p>
+    {% endif %}
+    <p><a href="/verwaltung/gruppen">Alle Gruppen verwalten</a></p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "basis.html" %}
+{% from "_makros.html" import csrf_feld, knopf, mit_rueckfrage, verschieben with context %}
+{% block titel %}{{ strecke.name }}{% endblock %}
+{% block inhalt %}
+<p class="brotkrumen"><a href="/verwaltung/strecken">Strecken</a> ›</p>
+<h1>{{ strecke.name }} {% if strecke.archiviert %}<span class="marke-archiv">archiviert</span>{% endif %}</h1>
+
+{% if anzahl_laeufe %}
+  <p class="hinweis">An dieser Strecke {{ "hängt" if anzahl_laeufe == 1 else "hängen" }} {{ anzahl_laeufe }}
+    {{ "Lauf" if anzahl_laeufe == 1 else "Läufe" }}. Posten und Items lassen sich daher nicht mehr
+    hinzufügen, löschen oder umsortieren; Texte kannst du weiterhin ändern.
+    Für einen Umbau: Strecke duplizieren.</p>
+{% endif %}
+
+<section class="karte">
+  <h2>Karte</h2>
+  {% set verortet = strecke.posten|selectattr("lat", "ne", none)|list|length %}
+  <p>{% if strecke.verlauf %}Verlauf eingezeichnet{% else %}Noch kein Verlauf eingezeichnet{% endif %}
+    · {{ verortet }} von {{ strecke.posten|length }} Posten verortet</p>
+  <p><a class="knopf knopf-haupt" href="/verwaltung/strecken/{{ strecke.id }}/karte">Auf der Karte planen</a></p>
+  <p class="hilfe">Strecke einzeichnen und Posten auf der Karte markieren. Das Posten-Blatt zeigt dann einen
+    Kartenausschnitt mit dem Standort des Postens.</p>
+</section>
+
+<section class="karte">
+  <h2>Posten in Fahrreihenfolge</h2>
+  {% if strecke.posten %}
+    <ol class="posten-liste">
+      {% for p in strecke.posten %}
+        <li>
+          <div class="zeile">
+            <div>
+              <a href="/verwaltung/posten/{{ p.id }}" class="posten-name">{{ p.name }}</a>
+              <span class="hilfe">{{ p.items|length }} Items{% if p.lat is none %} · ohne Standort{% endif %}</span>
+              {% if p.items %}<div class="hilfe">{{ p.items|map(attribute="kurzbezeichnung")|join(" · ") }}</div>{% endif %}
+            </div>
+            {% if not anzahl_laeufe %}{{ verschieben("/verwaltung/posten/%d/verschieben"|format(p.id), loop.first, loop.last) }}{% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p>Diese Strecke hat noch keine Posten.</p>
+  {% endif %}
+
+  {% if not anzahl_laeufe %}
+    <h3>Posten hinzufügen</h3>
+    <form method="post" action="/verwaltung/strecken/{{ strecke.id }}/posten" class="formular">
+      {{ csrf_feld() }}
+      <label>Name <input type="text" name="name" maxlength="200" required placeholder="z. B. Posten 3 – Einmündung Lindenweg"></label>
+      <label>Beschreibung <span class="hilfe">freiwillig, z. B. wo genau der Posten steht</span>
+        <textarea name="beschreibung" rows="2"></textarea></label>
+      <button type="submit" class="knopf">Posten hinzufügen</button>
+    </form>
+  {% endif %}
+</section>
+
+<section class="karte">
+  <h2>Strecke bearbeiten</h2>
+  <form method="post" action="/verwaltung/strecken/{{ strecke.id }}/bearbeiten" class="formular">
+    {{ csrf_feld() }}
+    <label>Name <input type="text" name="name" value="{{ strecke.name }}" maxlength="200" required></label>
+    <label>Beschreibung <textarea name="beschreibung" rows="2">{{ strecke.beschreibung }}</textarea></label>
+    <button type="submit" class="knopf">Speichern</button>
+  </form>
+
+  <div class="aktionsleiste">
+    {{ knopf("/verwaltung/strecken/%d/duplizieren"|format(strecke.id), "Duplizieren") }}
+    {% if strecke.archiviert %}
+      {{ knopf("/verwaltung/strecken/%d/reaktivieren"|format(strecke.id), "Wieder aktivieren") }}
+    {% else %}
+      {{ knopf("/verwaltung/strecken/%d/archivieren"|format(strecke.id), "Archivieren") }}
+    {% endif %}
+    {% if not anzahl_laeufe %}
+      {{ mit_rueckfrage("/verwaltung/strecken/%d/loeschen"|format(strecke.id), "Löschen",
+         "Die Strecke wird mit allen Posten und Items endgültig gelöscht.") }}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

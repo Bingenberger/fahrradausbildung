@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fahrradprüfungsstrecken – Kartengenerator</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  /* Layout: feste Steuerspalte links, Karte füllt den Rest; unter 900px gestapelt */
+  :root{
+    --bg:#f3f4f1; --panel:#ffffff; --ink:#1c2321; --muted:#5f6b66;
+    --line:#d8ddd8; --accent:#2f6fd0; --warn:#b45309; --ok:#1f7a54;
+    --r1:#d64545; --r2:#2f6fd0; --r3:#1f9e6e;
+    --font:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:14px/1.5 var(--font);background:var(--bg);color:var(--ink);overflow:hidden}
+  #app{display:flex;height:100%}
+  #side{width:340px;flex:0 0 340px;background:var(--panel);border-right:1px solid var(--line);
+        overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+  #mapwrap{flex:1;min-width:0;position:relative}
+  #map{position:absolute;inset:0}
+  h1{font-size:17px;margin:0;letter-spacing:-.01em}
+  h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 8px}
+  .card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel)}
+  .tabs{display:flex;gap:6px}
+  .tab{flex:1;min-width:0;border:1px solid var(--line);background:#fff;border-radius:7px;
+       padding:8px 6px;cursor:pointer;font:inherit;font-size:12px;text-align:center;
+       display:flex;flex-direction:column;align-items:center;gap:5px}
+  .tab .sw{width:22px;height:4px;border-radius:2px}
+  .tab[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);font-weight:600}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row>*{min-width:0}
+  button,select,input[type=text],input[type=number]{font:inherit;border:1px solid var(--line);
+       background:#fff;color:var(--ink);border-radius:6px;padding:7px 10px}
+  button{cursor:pointer}
+  button:hover{background:#eef1ee}
+  button.primary{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+  button.primary:hover{background:#000}
+  button.danger{color:#a12d2d;border-color:#e6c4c4}
+  button:focus-visible,select:focus-visible,input:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  label.opt{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
+  .modes{display:flex;flex-direction:column;gap:6px}
+  .stat{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;font-size:13px}
+  .stat b{font-weight:600}
+  .hint{font-size:12px;color:var(--muted);margin:0}
+  .vis{display:flex;gap:10px;align-items:center;font-size:13px;padding:3px 0}
+  .vis .sw{width:16px;height:4px;border-radius:2px;flex:0 0 16px}
+  ol.stations{margin:8px 0 0;padding-left:20px;font-size:13px}
+  ol.stations li{margin-bottom:3px}
+  ol.stations input{width:100%;padding:3px 6px;font-size:12px}
+  #status{position:absolute;left:12px;bottom:12px;z-index:900;background:rgba(255,255,255,.95);
+          border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;max-width:60%}
+  #status[hidden]{display:none}
+  .badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:99px;background:#eef1ee;color:var(--muted)}
+  .wp-dot{background:#fff;border:2px solid #333;border-radius:50%;width:12px;height:12px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .st-dot{background:#fff;border:2px solid #333;border-radius:50%;width:22px;height:22px;
+          display:flex;align-items:center;justify-content:center;font:700 12px/1 var(--font);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .grayscale .leaflet-tile-pane{filter:grayscale(1) contrast(1.05) brightness(1.04)}
+  @media (max-width:900px){
+    body{overflow:auto}
+    #app{flex-direction:column;height:auto}
+    #side{width:auto;flex:none;border-right:0;border-bottom:1px solid var(--line)}
+    #mapwrap{height:65vh;flex:none}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>Fahrradprüfungsstrecken<small>Kartenausschnitte aus OpenStreetMap, Export als SVG</small></h1>
+
+    <div class="card">
+      <h2>Kartenstil</h2>
+      <select id="source" style="width:100%">
+        <option value="cyclosm">CyclOSM – Radwege hervorgehoben</option>
+        <option value="osmde">OpenStreetMap deutsch</option>
+        <option value="osmfr">OpenStreetMap Frankreich</option>
+        <option value="hot">Humanitarian – hell, klare Straßen</option>
+        <option value="topo">OpenTopoMap</option>
+        <option value="osm">OpenStreetMap Standard</option>
+        <option value="custom">Eigene Kachel-URL …</option>
+      </select>
+      <input type="text" id="customUrl" placeholder="https://…/{z}/{x}/{y}.png" style="width:100%;margin-top:8px" hidden>
+      <p class="hint" id="srcAttr" style="margin-top:6px"></p>
+      <p class="hint" id="srcProbe" style="margin-top:4px">Kartenserver werden geprüft …</p>
+    </div>
+
+    <div class="card">
+      <h2>Variante</h2>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="routeName" style="flex:1" aria-label="Name der Variante">
+      </div>
+      <div class="stat" style="margin-top:8px"><span>Länge</span><b id="len">–</b></div>
+      <div class="stat"><span>Punkte</span><b id="ptcount">–</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Strecke eingeben</h2>
+      <div class="modes">
+        <label class="opt"><input type="radio" name="mode" value="route" checked>
+          <span><b>Wegpunkte</b> – klicken; die Strecke folgt automatisch den Straßen</span></label>
+        <label class="opt"><input type="radio" name="mode" value="trace">
+          <span><b>Frei zeichnen</b> – Punkt für Punkt selbst nachzeichnen</span></label>
+        <label class="opt"><input type="radio" name="mode" value="station">
+          <span><b>Station setzen</b> – nummerierte Punkte für Aufgaben</span></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label style="font-size:13px;display:flex;align-items:center;gap:6px;width:100%">Routing
+          <select id="engine" style="flex:1;min-width:0">
+            <option value="osrm-bike">Fahrrad – Radwege einbezogen</option>
+            <option value="osrm-foot">Fuß- und Radwege – auch reine Wege</option>
+            <option value="valhalla-bike">Fahrrad – zweiter Dienst</option>
+            <option value="valhalla-ped">Fuß- und Radwege – zweiter Dienst</option>
+            <option value="osrm-car">Nur Straßen (Auto-Routing)</option>
+            <option value="line">Luftlinie</option>
+          </select></label>
+      </div>
+      <p class="hint" id="engineHint" style="margin-top:6px"></p>
+      <label class="opt" style="margin-top:10px"><input type="checkbox" id="noUturn" checked>
+        <span>Kein Wenden auf der Stelle – die Strecke dreht über Kreisverkehr oder Block</span></label>
+      <div class="row" style="margin-top:10px">
+        <button id="undo">Letzten Punkt zurück</button>
+        <button id="clear" class="danger">Variante leeren</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Wegpunkte lassen sich mit der Maus verschieben. Rechtsklick auf einen Punkt löscht ihn.</p>
+    </div>
+
+    <div class="card">
+      <h2>Aus Datei übernehmen</h2>
+      <input type="file" id="file" accept=".kml,.gpx,.geojson,.json,.kmz" style="font-size:12px;width:100%">
+      <p class="hint" style="margin-top:6px">KML aus Google My&nbsp;Maps (Menü → „In KML exportieren“), GPX oder GeoJSON. Die Linie wird in die aktive Variante geladen.</p>
+    </div>
+
+    <div class="card">
+      <h2>Sichtbar in der Karte</h2>
+      <div id="vislist"></div>
+    </div>
+
+    <div class="card">
+      <h2>Stationen</h2>
+      <ol class="stations" id="stlist"></ol>
+      <p class="hint" id="sthint">Noch keine Stationen gesetzt.</p>
+    </div>
+
+    <div class="card">
+      <h2>Export</h2>
+      <label class="opt"><input type="checkbox" id="optGray"> Graustufen-Karte (druckfreundlich)</label>
+      <label class="opt"><input type="checkbox" id="optLegend" checked> Legende und Maßstab einzeichnen</label>
+      <label class="opt"><input type="checkbox" id="optStations" checked> Stationsnummern einzeichnen</label>
+      <label class="opt"><input type="checkbox" id="optAll"> Alle sichtbaren Varianten statt nur der aktiven</label>
+      <label class="opt" style="align-items:center"><input type="checkbox" id="opt2x" checked> Doppelte Auflösung für den Druck</label>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="expSvg" style="flex:1">SVG herunterladen</button>
+        <button id="expPng">PNG</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Exportiert wird genau der Kartenausschnitt, den du gerade siehst. Das SVG enthält das Kartenbild eingebettet und funktioniert ohne Internet.</p>
+    </div>
+
+    <p class="hint">Kartendaten © OpenStreetMap-Mitwirkende, ODbL. Diese Angabe wird in jeden Export übernommen und muss erhalten bleiben.</p>
+
+    <p class="hint">Bleibt die Karte leer, liegt es daran, dass die Kachelserver Aufrufe aus einer direkt geöffneten Datei ablehnen. Abhilfe: im Ordner der Datei ein Terminal öffnen, <code>python3 -m http.server 8000</code> starten und die Seite über <code>http://localhost:8000/fahrradpruefung-karten.html</code> aufrufen. Dann funktionieren alle Kartenstile.</p>
+  </aside>
+
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div id="status" hidden></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+"use strict";
+
+var SOURCES = {
+  cyclosm: {
+    label: "CyclOSM",
+    url: "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png",
+    subs: ["a","b","c"], maxZoom: 19,
+    attr: "Kartendaten © OpenStreetMap-Mitwirkende (ODbL), Darstellung CyclOSM"
+  },
+  osmde: {
+    label: "OpenStreetMap deutsch",
+    url: "https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png",
+    subs: ["a","b","c"], maxZoom: 18,
+    attr: "Kartendaten © OpenStreetMap-Mitwirkende (ODbL)"
+  },
+  osmfr: {
+    label: "OpenStreetMap Frankreich",
+    url: "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
+    subs: ["a","b","c"], maxZoom: 19,
+    attr: "Kartendaten © OpenStreetMap-Mitwirkende (ODbL), Darstellung OpenStreetMap France"
+  },
+  hot: {
+    label: "Humanitarian",
+    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+    subs: ["a","b"], maxZoom: 19,
+    attr: "Kartendaten © OpenStreetMap-Mitwirkende (ODbL), Darstellung Humanitarian OSM Team"
+  },
+  topo: {
+    label: "OpenTopoMap",
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    subs: ["a","b","c"], maxZoom: 17,
+    attr: "Kartendaten © OpenStreetMap-Mitwirkende (ODbL), Darstellung © OpenTopoMap (CC-BY-SA)"
+  },
+  osm: {
+    label: "OpenStreetMap Standard",
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    subs: [], maxZoom: 19,
+    attr: "Kartendaten © OpenStreetMap-Mitwirkende (ODbL)"
+  },
+  custom: {
+    label: "Eigene Kachel-URL",
+    url: "", subs: [], maxZoom: 19,
+    attr: "Kartendaten © OpenStreetMap-Mitwirkende (ODbL)"
+  }
+};
+var PROBE_ORDER = ["cyclosm","osmde","osmfr","hot","topo","osm"];
+var sourceKey = "cyclosm";
+function src(){
+  var s = SOURCES[sourceKey];
+  if(sourceKey === "custom"){
+    var u = (document.getElementById("customUrl").value || "").trim();
+    return { url: u, subs: s.subs, maxZoom: 19, attr: s.attr };
+  }
+  return s;
+}
+function tileUrl(z, x, y){
+  var s = src();
+  var subs = s.subs && s.subs.length ? s.subs : [""];
+  var pick = subs[Math.abs(x + y) % subs.length];
+  return s.url.replace("{s}", pick).replace("{z}", z).replace("{x}", x).replace("{y}", y);
+}
+
+var COLORS = ["#d64545", "#2f6fd0", "#1f9e6e"];
+var STORE_KEY = "fahrradpruefung-routen-v1";
+
+var state = {
+  active: 0,
+  routes: [0,1,2].map(function(i){
+    return { name: "Variante " + (i+1), mode: "route", waypoints: [], trace: [],
+             geometry: [], stations: [], visible: true, imported: false };
+  })
+};
+
+/* ---------- Persistenz ---------- */
+function save(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch(e){}
+}
+function load(){
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    var d = JSON.parse(raw);
+    if(d && d.routes && d.routes.length === 3){
+      state.active = d.active || 0;
+      for(var i=0;i<3;i++){
+        var s = d.routes[i] || {}, t = state.routes[i];
+        t.name = s.name || t.name;
+        t.mode = s.mode || "route";
+        t.waypoints = Array.isArray(s.waypoints) ? s.waypoints : [];
+        t.trace = Array.isArray(s.trace) ? s.trace : [];
+        t.geometry = Array.isArray(s.geometry) ? s.geometry : [];
+        t.stations = Array.isArray(s.stations) ? s.stations : [];
+        t.visible = s.visible !== false;
+        t.imported = !!s.imported;
+      }
+    }
+  } catch(e){}
+}
+
+/* ---------- Karte ---------- */
+var map = L.map("map", { center: [50.8140, 7.0400], zoom: 15, zoomControl: true });
+var tileLayer = null;
+var tileErrors = 0;
+
+function applySource(){
+  var s = src();
+  if(tileLayer) map.removeLayer(tileLayer);
+  tileErrors = 0;
+  if(!s.url){ document.getElementById("srcAttr").textContent = "Bitte eine Kachel-URL eintragen."; return; }
+  tileLayer = L.tileLayer(s.url, {
+    subdomains: s.subs, maxZoom: s.maxZoom,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende'
+  });
+  tileLayer.on("tileerror", function(){
+    tileErrors++;
+    if(tileErrors === 4){
+      statusMsg("Dieser Kartenserver liefert keine Kacheln aus. Bitte oben einen anderen Kartenstil wählen.", 10000);
+    }
+  });
+  tileLayer.addTo(map);
+  document.getElementById("srcAttr").textContent = s.attr;
+}
+
+L.control.scale({ imperial:false, metric:true }).addTo(map);
+
+var layerCasing = [], layerMain = [], wpMarkers = [], stMarkers = [];
+
+function statusMsg(text, ms){
+  var el = document.getElementById("status");
+  if(!text){ el.hidden = true; return; }
+  el.textContent = text; el.hidden = false;
+  if(ms){ setTimeout(function(){ if(el.textContent === text) el.hidden = true; }, ms); }
+}
+
+/* ---------- Geometrie ---------- */
+function haversine(a, b){
+  var R = 6371000, toRad = Math.PI/180;
+  var dLat = (b[0]-a[0])*toRad, dLon = (b[1]-a[1])*toRad;
+  var la1 = a[0]*toRad, la2 = b[0]*toRad;
+  var h = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return 2*R*Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function lineLength(pts){
+  var m = 0;
+  for(var i=1;i<pts.length;i++) m += haversine(pts[i-1], pts[i]);
+  return m;
+}
+function fmtLen(m){
+  if(!m) return "–";
+  return m < 1000 ? Math.round(m) + " m" : (m/1000).toFixed(2).replace(".", ",") + " km";
+}
+
+/* Valhalla liefert Polyline mit 6 Nachkommastellen */
+function decodePolyline(str, precision){
+  var index=0, lat=0, lng=0, coords=[], factor = Math.pow(10, precision||5);
+  while(index < str.length){
+    var b, shift=0, result=0;
+    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while(b >= 0x20);
+    lat += ((result & 1) ? ~(result >> 1) : (result >> 1));
+    shift = 0; result = 0;
+    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while(b >= 0x20);
+    lng += ((result & 1) ? ~(result >> 1) : (result >> 1));
+    coords.push([lat/factor, lng/factor]);
+  }
+  return coords;
+}
+
+/* ---------- Routing ----------
+   Welche Wege befahrbar sind, entscheidet das Profil des Routing-Dienstes.
+   Das Auto-Profil kennt reine Fuß- und Radwege nicht; deshalb stehen hier
+   zusätzlich ein Fahrrad- und ein Fußprofil zur Auswahl. */
+var ENGINES = {
+  "osrm-bike": {
+    label: "Fahrrad – Radwege einbezogen", kind: "osrm",
+    url: "https://routing.openstreetmap.de/routed-bike/route/v1/driving/",
+    hint: "Nutzt Straßen, Radwege und für Radfahrer freigegebene Wege. Für eine Fahrradprüfungsstrecke in der Regel die richtige Wahl."
+  },
+  "osrm-foot": {
+    label: "Fuß- und Radwege – auch reine Wege", kind: "osrm",
+    url: "https://routing.openstreetmap.de/routed-foot/route/v1/driving/",
+    hint: "Bezieht auch reine Fußwege und Durchgänge ein. Hilfreich, wenn ein Weg in OpenStreetMap nicht ausdrücklich für Radfahrer freigegeben ist. Bitte vor Ort prüfen, ob die Kinder dort fahren dürfen."
+  },
+  "valhalla-bike": {
+    label: "Fahrrad – zweiter Dienst", kind: "valhalla", costing: "bicycle",
+    options: { bicycle: { bicycle_type: "Hybrid", use_roads: 0.25, avoid_bad_surfaces: 0.25 } },
+    hint: "Zweiter Anbieter mit Fahrradprofil. Nützlich, wenn der erste eine Strecke nicht findet."
+  },
+  "valhalla-ped": {
+    label: "Fuß- und Radwege – zweiter Dienst", kind: "valhalla", costing: "pedestrian",
+    options: { pedestrian: { walking_speed: 5.0, step_penalty: 900, use_ferry: 0 } },
+    hint: "Zweiter Anbieter mit Fußprofil. Treppen werden stark gemieden, weil sie mit dem Rad nicht befahrbar sind."
+  },
+  "osrm-car": {
+    label: "Nur Straßen (Auto-Routing)", kind: "osrm",
+    url: "https://router.project-osrm.org/route/v1/driving/",
+    hint: "Bleibt ausschließlich auf Straßen. Fuß- und Radwege werden nicht genutzt."
+  },
+  "line": {
+    label: "Luftlinie", kind: "line",
+    hint: "Verbindet die Wegpunkte gerade. Zum exakten Nachzeichnen eignet sich der Modus „Frei zeichnen“ besser."
+  }
+};
+var FALLBACK = ["osrm-bike", "valhalla-bike", "osrm-foot", "valhalla-ped", "osrm-car"];
+var engineDown = {};
+
+function engineKey(){ return document.getElementById("engine").value; }
+
+function showEngineHint(){
+  var e = ENGINES[engineKey()];
+  document.getElementById("engineHint").textContent = e ? e.hint : "";
+}
+
+function routeWith(key, wp){
+  var e = ENGINES[key];
+  if(!e) return Promise.reject(new Error("unbekanntes Profil"));
+  if(e.kind === "line") return Promise.resolve(wp.slice());
+  return e.kind === "valhalla" ? valhallaRoute(e, wp) : osrmRoute(e, wp);
+}
+
+var routeSeq = 0;
+function computeGeometry(idx){
+  var r = state.routes[idx];
+  if(r.mode === "trace" || r.imported){ r.geometry = r.trace.slice(); redraw(); return Promise.resolve(); }
+  var wp = r.waypoints;
+  if(wp.length < 2){ r.geometry = wp.slice(); redraw(); return Promise.resolve(); }
+
+  var chosen = engineKey();
+  if(chosen === "line"){ r.geometry = wp.slice(); redraw(); save(); return Promise.resolve(); }
+
+  var seq = ++routeSeq;
+  statusMsg("Strecke wird berechnet …");
+
+  /* Reihenfolge: gewähltes Profil zuerst, danach die übrigen als Rückfallebene */
+  var order = [chosen].concat(FALLBACK.filter(function(k){
+    return k !== chosen && !engineDown[k];
+  }));
+
+  function attempt(i){
+    if(i >= order.length) return Promise.reject(new Error("kein Dienst erreichbar"));
+    return routeWith(order[i], wp).then(function(geom){
+      return { geom: geom, used: order[i] };
+    }).catch(function(err){
+      engineDown[order[i]] = true;
+      markEngine(order[i]);
+      return attempt(i + 1);
+    });
+  }
+
+  return attempt(0).then(function(res){
+    if(seq !== routeSeq) return;
+    unmarkEngine(res.used);          // hat doch geantwortet, Markierung zurücknehmen
+    r.geometry = res.geom; redraw(); save();
+    if(res.used === chosen) statusMsg(null);
+    else statusMsg("„" + ENGINES[chosen].label + "“ antwortet nicht. Berechnet mit „" +
+                   ENGINES[res.used].label + "“.", 9000);
+  }).catch(function(){
+    if(seq !== routeSeq) return;
+    r.geometry = wp.slice(); redraw(); save();
+    statusMsg("Kein Routing-Dienst erreichbar – es werden gerade Verbindungen gezeichnet. " +
+              "Mit „Frei zeichnen“ lässt sich die Strecke von Hand nachzeichnen.", 10000);
+  });
+}
+
+function markEngine(key){
+  var opt = document.querySelector('#engine option[value="' + key + '"]');
+  if(opt && opt.textContent.indexOf("nicht erreichbar") < 0){
+    opt.textContent = opt.textContent + " – nicht erreichbar";
+  }
+}
+function unmarkEngine(key){
+  delete engineDown[key];
+  var opt = document.querySelector('#engine option[value="' + key + '"]');
+  if(opt && ENGINES[key]) opt.textContent = ENGINES[key].label;
+}
+
+function osrmRoute(e, wp){
+  var coords = wp.map(function(p){ return p[1].toFixed(6) + "," + p[0].toFixed(6); }).join(";");
+  var base = e.url + coords + "?overview=full&geometries=geojson&continue_straight=";
+
+  function ask(noUturn){
+    return fetch(base + (noUturn ? "true" : "false")).then(function(res){
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function(j){
+      if(!j.routes || !j.routes.length) throw new Error("keine Route gefunden");
+      return j.routes[0].geometry.coordinates.map(function(c){ return [c[1], c[0]]; });
+    });
+  }
+
+  if(!document.getElementById("noUturn").checked) return ask(false);
+  /* Ohne Wenden gibt es nicht immer eine Lösung, etwa in einer Sackgasse. */
+  return ask(true).catch(function(){ return ask(false); });
+}
+
+function valhallaRoute(e, wp){
+  var noUturn = document.getElementById("noUturn").checked;
+  var body = {
+    locations: wp.map(function(p, i){
+      var last = (i === wp.length - 1);
+      var type = (noUturn && i > 0 && !last) ? "break_through" : "break";
+      return { lat: p[0], lon: p[1], type: type };
+    }),
+    costing: e.costing,
+    costing_options: e.options,
+    directions_options: { units: "kilometers", language: "de-DE" }
+  };
+  return fetch("https://valhalla1.openstreetmap.de/route", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+  }).then(function(res){
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }).then(function(j){
+    if(!j.trip || !j.trip.legs) throw new Error("keine Route gefunden");
+    var out = [];
+    j.trip.legs.forEach(function(leg){
+      decodePolyline(leg.shape, 6).forEach(function(c){ out.push(c); });
+    });
+    if(!out.length) throw new Error("leere Route");
+    return out;
+  });
+}
+
+/* ---------- Zeichnen ---------- */
+function clearLayers(arr){ arr.forEach(function(l){ map.removeLayer(l); }); arr.length = 0; }
+
+function redraw(){
+  clearLayers(layerCasing); clearLayers(layerMain);
+  clearLayers(wpMarkers); clearLayers(stMarkers);
+
+  state.routes.forEach(function(r, i){
+    if(!r.visible || r.geometry.length < 2) return;
+    var active = i === state.active;
+    layerCasing.push(L.polyline(r.geometry, {
+      color: "#ffffff", weight: active ? 11 : 8, opacity: .9, lineJoin: "round", lineCap: "round"
+    }).addTo(map));
+    layerMain.push(L.polyline(r.geometry, {
+      color: COLORS[i], weight: active ? 6 : 4, opacity: active ? 1 : .65,
+      lineJoin: "round", lineCap: "round"
+    }).addTo(map));
+  });
+
+  var ar = state.routes[state.active];
+  if(ar.mode === "route" && !ar.imported){
+    ar.waypoints.forEach(function(p, k){
+      var m = L.marker(p, {
+        draggable: true,
+        icon: L.divIcon({ className: "", html: '<div class="wp-dot" style="border-color:' + COLORS[state.active] + '"></div>',
+                          iconSize: [12,12], iconAnchor: [6,6] })
+      }).addTo(map);
+      m.on("dragend", function(e){
+        var ll = e.target.getLatLng();
+        ar.waypoints[k] = [ll.lat, ll.lng];
+        computeGeometry(state.active);
+      });
+      m.on("contextmenu", function(){
+        ar.waypoints.splice(k, 1);
+        computeGeometry(state.active);
+      });
+      wpMarkers.push(m);
+    });
+  }
+
+  state.routes.forEach(function(r, i){
+    if(!r.visible) return;
+    r.stations.forEach(function(s, k){
+      var m = L.marker([s.lat, s.lng], {
+        icon: L.divIcon({ className: "", html: '<div class="st-dot" style="border-color:' + COLORS[i] + ';color:' + COLORS[i] + '">' + (k+1) + '</div>',
+                          iconSize: [22,22], iconAnchor: [11,11] })
+      }).addTo(map);
+      if(i === state.active){
+        m.on("contextmenu", function(){ r.stations.splice(k,1); renderSide(); redraw(); save(); });
+      }
+      stMarkers.push(m);
+    });
+  });
+
+  updateStats();
+}
+
+function updateStats(){
+  var r = state.routes[state.active];
+  document.getElementById("len").textContent = fmtLen(lineLength(r.geometry));
+  var n = r.imported ? r.geometry.length : (r.mode === "trace" ? r.trace.length : r.waypoints.length);
+  document.getElementById("ptcount").textContent = n + (r.imported ? " (importiert)" : "");
+}
+
+/* ---------- Bedienung links ---------- */
+function renderTabs(){
+  var el = document.getElementById("tabs");
+  el.innerHTML = "";
+  state.routes.forEach(function(r, i){
+    var b = document.createElement("button");
+    b.className = "tab"; b.type = "button"; b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", i === state.active ? "true" : "false");
+    b.innerHTML = '<span class="sw" style="background:' + COLORS[i] + '"></span>';
+    b.appendChild(document.createTextNode(r.name));
+    b.onclick = function(){ state.active = i; renderSide(); redraw(); save(); };
+    el.appendChild(b);
+  });
+}
+
+function renderVis(){
+  var el = document.getElementById("vislist");
+  el.innerHTML = "";
+  state.routes.forEach(function(r, i){
+    var lab = document.createElement("label");
+    lab.className = "vis";
+    var cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = r.visible;
+    cb.onchange = function(){ r.visible = cb.checked; redraw(); save(); };
+    var sw = document.createElement("span");
+    sw.className = "sw"; sw.style.background = COLORS[i];
+    lab.appendChild(cb); lab.appendChild(sw);
+    lab.appendChild(document.createTextNode(r.name + "  "));
+    var badge = document.createElement("span");
+    badge.className = "badge"; badge.textContent = fmtLen(lineLength(r.geometry));
+    lab.appendChild(badge);
+    el.appendChild(lab);
+  });
+}
+
+function renderStations(){
+  var r = state.routes[state.active];
+  var ol = document.getElementById("stlist");
+  ol.innerHTML = "";
+  document.getElementById("sthint").hidden = r.stations.length > 0;
+  r.stations.forEach(function(s, k){
+    var li = document.createElement("li");
+    var inp = document.createElement("input");
+    inp.type = "text"; inp.value = s.label || ""; inp.placeholder = "Aufgabe an Station " + (k+1);
+    inp.oninput = function(){ s.label = inp.value; save(); };
+    li.appendChild(inp);
+    ol.appendChild(li);
+  });
+}
+
+function renderSide(){
+  renderTabs(); renderVis(); renderStations();
+  document.getElementById("routeName").value = state.routes[state.active].name;
+  var m = state.routes[state.active].mode;
+  var radios = document.getElementsByName("mode");
+  for(var i=0;i<radios.length;i++) radios[i].checked = (radios[i].value === m);
+  updateStats();
+}
+
+/* ---------- Klicks auf die Karte ---------- */
+map.on("click", function(e){
+  var r = state.routes[state.active];
+  var pt = [e.latlng.lat, e.latlng.lng];
+  if(r.mode === "station"){
+    r.stations.push({ lat: pt[0], lng: pt[1], label: "" });
+    renderStations(); redraw(); save(); return;
+  }
+  if(r.imported){
+    statusMsg("Diese Variante stammt aus einer Datei. Zum Bearbeiten zuerst „Variante leeren“.", 5000);
+    return;
+  }
+  if(r.mode === "trace"){ r.trace.push(pt); computeGeometry(state.active); }
+  else { r.waypoints.push(pt); computeGeometry(state.active); }
+  save();
+});
+
+document.getElementById("routeName").oninput = function(){
+  state.routes[state.active].name = this.value || ("Variante " + (state.active+1));
+  renderTabs(); renderVis(); save();
+};
+
+Array.prototype.forEach.call(document.getElementsByName("mode"), function(el){
+  el.onchange = function(){
+    var r = state.routes[state.active];
+    r.mode = el.value;
+    if(el.value !== "station") computeGeometry(state.active);
+    redraw(); save();
+  };
+});
+
+document.getElementById("engine").onchange = function(){
+  showEngineHint();
+  try { localStorage.setItem("fahrradpruefung-engine", this.value); } catch(e){}
+  computeGeometry(state.active);
+};
+document.getElementById("noUturn").onchange = function(){ computeGeometry(state.active); };
+
+document.getElementById("undo").onclick = function(){
+  var r = state.routes[state.active];
+  if(r.imported){ statusMsg("Importierte Strecke – bitte „Variante leeren“.", 4000); return; }
+  if(r.mode === "station"){ r.stations.pop(); renderStations(); redraw(); save(); return; }
+  if(r.mode === "trace") r.trace.pop(); else r.waypoints.pop();
+  computeGeometry(state.active); save();
+};
+
+document.getElementById("clear").onclick = function(){
+  var r = state.routes[state.active];
+  r.waypoints = []; r.trace = []; r.geometry = []; r.stations = []; r.imported = false;
+  renderSide(); redraw(); save();
+};
+
+/* ---------- Import ---------- */
+document.getElementById("file").onchange = function(){
+  var f = this.files && this.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(){
+    var text = String(reader.result), pts = [];
+    try {
+      if(/\.(geojson|json)$/i.test(f.name)) pts = fromGeoJSON(JSON.parse(text));
+      else pts = fromXML(text);
+    } catch(err){
+      statusMsg("Datei konnte nicht gelesen werden: " + err.message, 7000); return;
+    }
+    if(pts.length < 2){ statusMsg("In der Datei wurde keine Linie gefunden.", 6000); return; }
+    var r = state.routes[state.active];
+    r.imported = true; r.trace = pts; r.geometry = pts; r.waypoints = [];
+    redraw(); renderSide(); save();
+    map.fitBounds(L.latLngBounds(pts), { padding: [30,30] });
+    statusMsg(pts.length + " Punkte übernommen (" + fmtLen(lineLength(pts)) + ").", 5000);
+  };
+  reader.readAsText(f);
+};
+
+function fromGeoJSON(obj){
+  var out = [];
+  function walk(g){
+    if(!g) return;
+    if(g.type === "FeatureCollection") g.features.forEach(function(f){ walk(f.geometry); });
+    else if(g.type === "Feature") walk(g.geometry);
+    else if(g.type === "GeometryCollection") g.geometries.forEach(walk);
+    else if(g.type === "LineString") g.coordinates.forEach(function(c){ out.push([c[1], c[0]]); });
+    else if(g.type === "MultiLineString") g.coordinates.forEach(function(l){ l.forEach(function(c){ out.push([c[1], c[0]]); }); });
+  }
+  walk(obj);
+  return out;
+}
+
+function fromXML(text){
+  var doc = new DOMParser().parseFromString(text, "application/xml");
+  if(doc.getElementsByTagName("parsererror").length) throw new Error("kein gültiges XML");
+  var out = [], i, j;
+
+  var trkpt = doc.getElementsByTagName("trkpt");
+  var rtept = doc.getElementsByTagName("rtept");
+  var gpxPts = trkpt.length ? trkpt : rtept;
+  for(i=0;i<gpxPts.length;i++){
+    var la = parseFloat(gpxPts[i].getAttribute("lat")), lo = parseFloat(gpxPts[i].getAttribute("lon"));
+    if(isFinite(la) && isFinite(lo)) out.push([la, lo]);
+  }
+  if(out.length) return out;
+
+  var all = doc.getElementsByTagName("*");
+  for(i=0;i<all.length;i++){
+    var tag = all[i].localName || all[i].nodeName;
+    if(tag !== "coordinates") continue;
+    var chunks = (all[i].textContent || "").trim().split(/\s+/);
+    for(j=0;j<chunks.length;j++){
+      var parts = chunks[j].split(",");
+      if(parts.length < 2) continue;
+      var lon = parseFloat(parts[0]), lat = parseFloat(parts[1]);
+      if(isFinite(lat) && isFinite(lon)) out.push([lat, lon]);
+    }
+    if(out.length > 1) break;
+  }
+  return out;
+}
+
+/* ---------- Kartenserver selbst prüfen ----------
+   Ob ein Server Kacheln herausgibt, hängt davon ab, wie diese Datei geöffnet
+   wurde. Statt zu raten, probiert die Seite beim Start eine Kachel je Quelle. */
+function tileIndex(lat, lon, z){
+  var n = Math.pow(2, z);
+  var x = Math.floor((lon + 180) / 360 * n);
+  var s = Math.sin(lat * Math.PI / 180);
+  var y = Math.floor((0.5 - Math.log((1+s)/(1-s)) / (4*Math.PI)) * n);
+  return { x: x, y: y };
+}
+
+function probeSource(key){
+  var prev = sourceKey;
+  sourceKey = key;
+  var c = map.getCenter();
+  var t = tileIndex(c.lat, c.lng, Math.min(SOURCES[key].maxZoom, 13));
+  var url = tileUrl(Math.min(SOURCES[key].maxZoom, 13), t.x, t.y);
+  sourceKey = prev;
+
+  return new Promise(function(resolve){
+    var img = new Image(), settled = false;
+    var timer = setTimeout(function(){ if(!settled){ settled = true; resolve(false); } }, 8000);
+    function finish(ok){
+      if(settled) return;
+      settled = true; clearTimeout(timer); resolve(ok);
+    }
+    img.crossOrigin = "anonymous";
+    img.onload = function(){ finish(img.naturalWidth > 0); };
+    img.onerror = function(){ finish(false); };
+    img.src = url + (url.indexOf("?") < 0 ? "?" : "&") + "probe=" + Date.now();
+  });
+}
+
+function probeAll(){
+  var note = document.getElementById("srcProbe");
+  var sel = document.getElementById("source");
+  return Promise.all(PROBE_ORDER.map(function(k){
+    return probeSource(k).then(function(ok){ return { key: k, ok: ok }; });
+  })).then(function(results){
+    var working = [];
+    results.forEach(function(r){
+      var opt = sel.querySelector('option[value="' + r.key + '"]');
+      if(!opt) return;
+      if(r.ok){ working.push(r.key); opt.disabled = false; }
+      else { opt.disabled = true; opt.textContent = opt.textContent + " – nicht erreichbar"; }
+    });
+
+    if(!working.length){
+      note.textContent = "Kein Kartenserver liefert Kacheln aus. Die Datei muss dafür über einen Webserver geöffnet werden – siehe Hinweis unten.";
+      return;
+    }
+    note.textContent = working.length + " von " + PROBE_ORDER.length + " Kartenstilen verfügbar.";
+    if(working.indexOf(sourceKey) < 0){
+      sourceKey = working[0];
+      sel.value = sourceKey;
+      applySource();
+      statusMsg("Kartenstil auf „" + SOURCES[sourceKey].label + "“ gesetzt – nur dieser liefert hier Kacheln.", 8000);
+    }
+  });
+}
+
+/* ---------- Kartenstil ---------- */
+document.getElementById("source").onchange = function(){
+  sourceKey = this.value;
+  document.getElementById("customUrl").hidden = (sourceKey !== "custom");
+  applySource();
+  try { localStorage.setItem("fahrradpruefung-quelle", sourceKey); } catch(e){}
+};
+document.getElementById("customUrl").onchange = function(){ applySource(); };
+
+/* ---------- Graustufen-Vorschau ---------- */
+document.getElementById("optGray").onchange = function(){
+  document.body.classList.toggle("grayscale", this.checked);
+};
+
+/* ---------- Export ---------- */
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function loadTile(url){
+  return new Promise(function(resolve){
+    var img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function(){
+      try {
+        var c = document.createElement("canvas");
+        c.width = 256; c.height = 256;
+        c.getContext("2d").drawImage(img, 0, 0, 256, 256);
+        resolve(c.toDataURL("image/png"));
+      } catch(e){ resolve(null); }
+    };
+    img.onerror = function(){ resolve(null); };
+    img.src = url;
+  });
+}
+
+function niceScale(maxMeters){
+  var steps = [10,20,25,50,100,150,200,250,500,750,1000,1500,2000,3000,5000];
+  var best = steps[0];
+  for(var i=0;i<steps.length;i++) if(steps[i] <= maxMeters) best = steps[i];
+  return best;
+}
+
+function buildSVG(){
+  var scale = document.getElementById("opt2x").checked ? 2 : 1;
+  var gray = document.getElementById("optGray").checked;
+  var withLegend = document.getElementById("optLegend").checked;
+  var withStations = document.getElementById("optStations").checked;
+  var all = document.getElementById("optAll").checked;
+
+  var size = map.getSize();
+  var W = Math.round(size.x * scale), H = Math.round(size.y * scale);
+  var srcMax = src().maxZoom || 19;
+  var z = Math.min(srcMax, map.getZoom() + (scale === 2 ? 1 : 0));
+
+  var nw = map.getBounds().getNorthWest();
+  var se = map.getBounds().getSouthEast();
+  var originPt = map.project(nw, z);           // Pixelursprung des Ausschnitts auf Zoomstufe z
+  var sePt = map.project(se, z);
+  var pxW = sePt.x - originPt.x, pxH = sePt.y - originPt.y;
+  var kx = W / pxW, ky = H / pxH;              // kleine Korrektur gegen Rundungsfehler
+
+  function proj(latlng){
+    var p = map.project(L.latLng(latlng[0], latlng[1]), z);
+    return [ (p.x - originPt.x) * kx, (p.y - originPt.y) * ky ];
+  }
+
+  var x0 = Math.floor(originPt.x / 256), x1 = Math.floor(sePt.x / 256);
+  var y0 = Math.floor(originPt.y / 256), y1 = Math.floor(sePt.y / 256);
+  var maxIdx = Math.pow(2, z) - 1;
+  var jobs = [];
+  for(var tx = x0; tx <= x1; tx++){
+    for(var ty = y0; ty <= y1; ty++){
+      if(ty < 0 || ty > maxIdx) continue;
+      var wx = ((tx % (maxIdx+1)) + (maxIdx+1)) % (maxIdx+1);
+      jobs.push({
+        url: tileUrl(z, wx, ty),
+        x: (tx*256 - originPt.x) * kx,
+        y: (ty*256 - originPt.y) * ky
+      });
+    }
+  }
+
+  statusMsg("Kartenkacheln werden geladen (0/" + jobs.length + ") …");
+  var done = 0;
+  return Promise.all(jobs.map(function(j){
+    return loadTile(j.url).then(function(data){
+      done++; statusMsg("Kartenkacheln werden geladen (" + done + "/" + jobs.length + ") …");
+      j.data = data; return j;
+    });
+  })).then(function(tiles){
+
+    var attrText = src().attr;
+    var missing = tiles.filter(function(t){ return !t.data; }).length;
+    if(missing === tiles.length){
+      throw new Error("Der Kartenserver hat keine Kachel geliefert. Bitte einen anderen Kartenstil wählen.");
+    }
+
+    var parts = [];
+    parts.push('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
+               'width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">');
+    parts.push('<title>' + esc(all ? "Fahrradprüfungsstrecken" : state.routes[state.active].name) + '</title>');
+    parts.push('<desc>' + esc(attrText) + '</desc>');
+    parts.push('<defs><clipPath id="viewclip"><rect x="0" y="0" width="' + W + '" height="' + H + '"/></clipPath>');
+    if(gray) parts.push('<filter id="gray"><feColorMatrix type="saturate" values="0"/>' +
+                        '<feComponentTransfer><feFuncR type="linear" slope="1.04"/><feFuncG type="linear" slope="1.04"/><feFuncB type="linear" slope="1.04"/></feComponentTransfer></filter>');
+    parts.push('</defs>');
+    parts.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#f2efe9"/>');
+
+    parts.push('<g clip-path="url(#viewclip)"' + (gray ? ' filter="url(#gray)"' : '') + '>');
+    tiles.forEach(function(t){
+      if(!t.data) return;
+      parts.push('<image x="' + t.x.toFixed(2) + '" y="' + t.y.toFixed(2) +
+                 '" width="' + (256*kx).toFixed(2) + '" height="' + (256*ky).toFixed(2) +
+                 '" xlink:href="' + t.data + '"/>');
+    });
+    parts.push('</g>');
+
+    var shown = [];
+    state.routes.forEach(function(r, i){
+      if(r.geometry.length < 2) return;
+      if(all ? !r.visible : i !== state.active) return;
+      shown.push({ r: r, i: i });
+    });
+
+    parts.push('<g clip-path="url(#viewclip)" fill="none" stroke-linejoin="round" stroke-linecap="round">');
+    shown.forEach(function(s){
+      var d = s.r.geometry.map(function(p, k){
+        var q = proj(p);
+        return (k ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1);
+      }).join(" ");
+      parts.push('<path d="' + d + '" stroke="#ffffff" stroke-width="' + (10*scale) + '" stroke-opacity="0.9"/>');
+      parts.push('<path d="' + d + '" stroke="' + COLORS[s.i] + '" stroke-width="' + (5*scale) + '"/>');
+
+      var a = proj(s.r.geometry[0]), b = proj(s.r.geometry[s.r.geometry.length-1]);
+      parts.push('<circle cx="' + a[0].toFixed(1) + '" cy="' + a[1].toFixed(1) + '" r="' + (7*scale) +
+                 '" fill="#ffffff" stroke="' + COLORS[s.i] + '" stroke-width="' + (3*scale) + '"/>');
+      parts.push('<circle cx="' + b[0].toFixed(1) + '" cy="' + b[1].toFixed(1) + '" r="' + (4*scale) +
+                 '" fill="' + COLORS[s.i] + '" stroke="#ffffff" stroke-width="' + (2.5*scale) + '"/>');
+    });
+    parts.push('</g>');
+
+    if(withStations){
+      parts.push('<g clip-path="url(#viewclip)" font-family="Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle">');
+      shown.forEach(function(s){
+        s.r.stations.forEach(function(st, k){
+          var q = proj([st.lat, st.lng]);
+          parts.push('<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="' + (11*scale) +
+                     '" fill="#ffffff" stroke="' + COLORS[s.i] + '" stroke-width="' + (2.5*scale) + '"/>');
+          parts.push('<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 4.5*scale).toFixed(1) +
+                     '" font-size="' + (13*scale) + '" fill="' + COLORS[s.i] + '">' + (k+1) + '</text>');
+        });
+      });
+      parts.push('</g>');
+    }
+
+    /* Maßstab */
+    var lat = map.getCenter().lat;
+    var mPerPx = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z) / kx;
+    var target = niceScale(mPerPx * (W * 0.28));
+    var barPx = target / mPerPx;
+    var barY = H - 18 * scale, barX = 16 * scale;
+
+    if(withLegend){
+      var lineH = 20 * scale;
+      var boxH = (30 + shown.length * 20) * scale;
+      var boxW = 0;
+      shown.forEach(function(s){
+        var label = s.r.name + " – " + fmtLen(lineLength(s.r.geometry));
+        boxW = Math.max(boxW, label.length * 7.4 * scale + 48 * scale);
+      });
+      boxW = Math.max(boxW, 150 * scale);
+      parts.push('<g font-family="Arial, Helvetica, sans-serif">');
+      parts.push('<rect x="' + (16*scale) + '" y="' + (16*scale) + '" width="' + boxW.toFixed(0) +
+                 '" height="' + boxH.toFixed(0) + '" rx="' + (6*scale) + '" fill="#ffffff" fill-opacity="0.92" stroke="#c9cfc9"/>');
+      parts.push('<text x="' + (28*scale) + '" y="' + (36*scale) + '" font-size="' + (13*scale) +
+                 '" font-weight="700" fill="#1c2321">Fahrradprüfungsstrecke</text>');
+      shown.forEach(function(s, n){
+        var y = (52 + n*20) * scale;
+        parts.push('<rect x="' + (28*scale) + '" y="' + (y - 8*scale) + '" width="' + (22*scale) +
+                   '" height="' + (5*scale) + '" rx="' + (2.5*scale) + '" fill="' + COLORS[s.i] + '"/>');
+        parts.push('<text x="' + (58*scale) + '" y="' + (y - 1*scale) + '" font-size="' + (12*scale) +
+                   '" fill="#1c2321">' + esc(s.r.name + " – " + fmtLen(lineLength(s.r.geometry))) + '</text>');
+      });
+      parts.push('</g>');
+
+      parts.push('<g font-family="Arial, Helvetica, sans-serif">');
+      parts.push('<rect x="' + (barX - 6*scale) + '" y="' + (barY - 16*scale) + '" width="' + (barPx + 12*scale) +
+                 '" height="' + (26*scale) + '" rx="' + (4*scale) + '" fill="#ffffff" fill-opacity="0.85"/>');
+      parts.push('<line x1="' + barX + '" y1="' + barY + '" x2="' + (barX + barPx) + '" y2="' + barY +
+                 '" stroke="#1c2321" stroke-width="' + (2.5*scale) + '"/>');
+      parts.push('<line x1="' + barX + '" y1="' + (barY - 5*scale) + '" x2="' + barX + '" y2="' + (barY + 5*scale) +
+                 '" stroke="#1c2321" stroke-width="' + (2.5*scale) + '"/>');
+      parts.push('<line x1="' + (barX + barPx) + '" y1="' + (barY - 5*scale) + '" x2="' + (barX + barPx) + '" y2="' + (barY + 5*scale) +
+                 '" stroke="#1c2321" stroke-width="' + (2.5*scale) + '"/>');
+      parts.push('<text x="' + barX + '" y="' + (barY - 7*scale) + '" font-size="' + (11*scale) +
+                 '" fill="#1c2321">' + (target >= 1000 ? (target/1000) + " km" : target + " m") + '</text>');
+      parts.push('</g>');
+    }
+
+    parts.push('<text x="' + (W - 10*scale) + '" y="' + (H - 8*scale) + '" text-anchor="end" ' +
+               'font-family="Arial, Helvetica, sans-serif" font-size="' + (11*scale) + '" fill="#333333">' +
+               esc(attrText) + '</text>');
+    parts.push('</svg>');
+
+    statusMsg(null);
+    return { svg: parts.join(""), W: W, H: H,
+             name: (all ? "fahrradpruefung-alle" : slug(state.routes[state.active].name)) };
+  });
+}
+
+function slug(s){
+  return String(s).toLowerCase()
+    .replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || "strecke";
+}
+
+function download(blob, filename){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+
+document.getElementById("expSvg").onclick = function(){
+  buildSVG().then(function(res){
+    download(new Blob([res.svg], { type: "image/svg+xml;charset=utf-8" }), res.name + ".svg");
+  }).catch(function(e){ statusMsg("Export fehlgeschlagen: " + e.message, 8000); });
+};
+
+document.getElementById("expPng").onclick = function(){
+  buildSVG().then(function(res){
+    var img = new Image();
+    var blobUrl = URL.createObjectURL(new Blob([res.svg], { type: "image/svg+xml;charset=utf-8" }));
+    img.onload = function(){
+      var c = document.createElement("canvas");
+      c.width = res.W; c.height = res.H;
+      c.getContext("2d").drawImage(img, 0, 0);
+      c.toBlob(function(b){ download(b, res.name + ".png"); URL.revokeObjectURL(blobUrl); }, "image/png");
+    };
+    img.onerror = function(){ statusMsg("PNG-Export fehlgeschlagen. Das SVG funktioniert trotzdem.", 8000); };
+    img.src = blobUrl;
+  }).catch(function(e){ statusMsg("Export fehlgeschlagen: " + e.message, 8000); });
+};
+
+/* ---------- Start ---------- */
+try {
+  var savedSrc = localStorage.getItem("fahrradpruefung-quelle");
+  if(savedSrc && SOURCES[savedSrc]) sourceKey = savedSrc;
+} catch(e){}
+document.getElementById("source").value = sourceKey;
+document.getElementById("customUrl").hidden = (sourceKey !== "custom");
+applySource();
+probeAll();
+
+try {
+  var savedEngine = localStorage.getItem("fahrradpruefung-engine");
+  if(savedEngine && ENGINES[savedEngine]) document.getElementById("engine").value = savedEngine;
+} catch(e){}
+showEngineHint();
+
+load();
+renderSide();
+redraw();
+
+var allPts = [];
+state.routes.forEach(function(r){ if(r.visible) r.geometry.forEach(function(p){ allPts.push(p); }); });
+if(allPts.length > 1){
+  map.fitBounds(L.latLngBounds(allPts), { padding: [40,40] });
+} else {
+  fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent("Niederkassel, Rhein-Sieg-Kreis"))
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(j && j[0]) map.setView([parseFloat(j[0].lat), parseFloat(j[0].lon)], 15);
+    }).catch(function(){});
+  statusMsg("Karte auf den Schulbereich zoomen, dann die Strecke klicken.", 8000);
+}
+})();
+</script>
+</body>
+</html>

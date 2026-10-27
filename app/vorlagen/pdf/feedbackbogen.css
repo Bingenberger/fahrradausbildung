@@ -1,0 +1,60 @@
+/* Feedbackbogen: eine A4-Seite je Kind. Austauschbar je Schule. */
+
+@page { size: A4; margin: 15mm 18mm 14mm 18mm; }
+
+body {
+  font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+  font-size: 13pt;
+  line-height: 1.45;
+  color: #000;
+}
+
+.bogen {
+  page-break-after: always;
+  height: 264mm;           /* knapp A4 minus Seitenränder: Fußzeile unten halten */
+  display: flex;
+  flex-direction: column;
+}
+.bogen:last-child { page-break-after: auto; }
+
+.kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10pt;
+  border-bottom: 1px solid #000;
+  padding-bottom: 2mm;
+}
+.kopf-links { display: flex; align-items: center; gap: 4mm; }
+.logo { max-height: 16mm; max-width: 50mm; }
+
+h1 { font-size: 22pt; margin: 8mm 0 0; }
+.wer { display: flex; align-items: flex-end; gap: 8mm; margin: 3mm 0 6mm; }
+.startnummer { font-size: 18pt; font-weight: bold; white-space: nowrap; }
+/* Platz für den Namen – die Lehrkraft schreibt ihn von Hand dazu. */
+.namensfeld { flex: 1; font-size: 13pt; border-bottom: 0.75pt solid #000; padding-bottom: 1mm; }
+.einleitung { margin: 0 0 4mm; }
+
+.abschnitt { margin-top: 5mm; }
+h2 { font-size: 15pt; margin: 0 0 2mm; }
+
+.gut ul { list-style: none; margin: 0; padding: 0; }
+.gut ul.zweispaltig { columns: 2; column-gap: 8mm; }
+.gut li { break-inside: avoid; padding-left: 8mm; text-indent: -8mm; margin: 1mm 0; }
+.gut li::before { content: "✓"; display: inline-block; width: 8mm; text-indent: 0; font-weight: bold; }
+
+.ueben ol { margin: 0; padding-left: 7mm; }
+.ueben li { margin: 2mm 0; }
+
+.lehrkraft { margin-top: 7mm; flex: 1; display: flex; flex-direction: column; }
+.schreibfeld {
+  flex: 1;
+  min-height: 40mm;
+  border: 0.75pt solid #000;
+  border-radius: 2mm;
+  padding: 0 4mm;
+  overflow: hidden;
+}
+.linie { height: 9mm; border-bottom: 0.5pt solid #999; }
+
+.fuss { margin-top: 4mm; font-size: 9pt; color: #333; text-align: center; }

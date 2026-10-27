@@ -1,0 +1,57 @@
+{% extends "basis.html" %}
+{% block titel %}Nr. {{ z.kind.startnummer }} – Auswertung{% endblock %}
+{% block inhalt %}
+<p class="brotkrumen"><a href="/verwaltung/laeufe">Läufe</a> › <a href="/verwaltung/laeufe/{{ lauf.id }}">{{ lauf.datum|datum_lang }}</a> ›
+  <a href="/verwaltung/laeufe/{{ lauf.id }}/auswertung">Auswertung</a> ›</p>
+<h1>Nr. {{ z.kind.startnummer }}
+  {% if not z.kind.aktiv %}<span class="leise">(inaktiv)</span>{% endif %}</h1>
+<p class="aktionsleiste">
+  {% if vorher %}<a href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ vorher.id }}">‹ Nr. {{ vorher.startnummer }}</a>{% endif %}
+  {% if nachher %}<a href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ nachher.id }}">Nr. {{ nachher.startnummer }} ›</a>{% endif %}
+</p>
+{% set e = z.ergebnis %}
+<p><a class="knopf knopf-haupt" href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ z.kind.id }}/feedbackbogen.pdf">Feedbackbogen (PDF)</a></p>
+
+<section class="karte">
+  <h2>Fahrsicherheit</h2>
+  {% if e.stark_abweichend %}<p><span class="marke-abweichung">Die Posten schätzen das Kind sehr unterschiedlich ein.</span></p>{% endif %}
+  <table class="tabelle">
+    <thead><tr><th>Posten</th><th>Einschätzung</th><th>Bemerkung</th></tr></thead>
+    <tbody>
+      {% for p in posten %}
+        {% set pe = e.posten[p.id] %}
+        <tr>
+          <td>{{ loop.index }}. {{ p.name }}</td>
+          <td>{% if pe.stufe %}<span class="stufe stufe-{{ pe.stufe }}">{{ stufen_text[pe.stufe] }}</span>{% else %}<span class="leise">keine</span>{% endif %}</td>
+          <td>{{ pe.bemerkung or "" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% for p in posten %}
+  {% set pe = e.posten[p.id] %}
+  <section class="karte">
+    <h2>{{ loop.index }}. {{ p.name }}</h2>
+    {% if not pe.durchgaenge %}
+      <p class="fehlt-text">Keine Durchgänge erfasst.</p>
+    {% else %}
+      <p>{{ pe.durchgaenge }} {{ "Durchgang" if pe.durchgaenge == 1 else "Durchgänge" }}</p>
+      <table class="tabelle">
+        <thead><tr><th>Punkt</th><th class="zahl">vergessen</th><th><span class="unsichtbar">Anteil</span></th></tr></thead>
+        <tbody>
+          {% for i in p.items %}
+            {% set q = pe.items[i.id] %}
+            <tr>
+              <td>{{ i.kurzbezeichnung }}</td>
+              <td class="zahl">{{ q.vergessen }} von {{ q.gesamt }}</td>
+              <td>{% if q.vergessen %}<meter class="anteil" min="0" max="1" low="0.2499" high="0.5" optimum="0" value="{{ q.quote }}">{{ q.vergessen }} von {{ q.gesamt }}</meter>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+{% endfor %}
+{% endblock %}
