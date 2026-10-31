@@ -29,7 +29,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.mandant import FPSession
-from app.modelle import Ereignis, Item, Kind, Lauf, PostenToken
+from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, PostenToken
 from app.token import token_gueltig
 
 log = logging.getLogger("fahrradpruefung.posten")
@@ -40,6 +40,8 @@ MAX_EREIGNISSE = 1000
 MAX_BYTES = 2_000_000
 MAX_BEMERKUNG = 500
 MAX_DURCHGANG = 1000
+# Mehr Läufe an einem Posten zur Auswahl zu stellen hilft niemandem.
+MAX_WEITERE_LAEUFE = 20
 
 
 # --------------------------------------------------------------------------- Hilfen
@@ -103,6 +105,37 @@ def _startnummern(session: FPSession, gruppe_id: int, nur_aktive: bool) -> list[
     return sorted(session.execute(stmt).scalars())
 
 
+def _weitere_laeufe(session: FPSession, zugang: Zugang) -> list[dict[str, Any]]:
+    """Andere Läufe, die an genau diesem Posten noch anstehen.
+
+    Damit wechselt die Person am Posten in der installierten App auf den
+    nächsten Lauf, statt den QR-Code erneut zu scannen – das legte sonst ein
+    zweites Symbol auf dem Home-Bildschirm an (Spezifikation 6). Je Token bleibt
+    es bei genau einem Lauf; hier steht nur, welche weiteren es gibt.
+
+    Die Klassenbezeichnung muss mit, sonst sind zwei Läufe am selben Tag nicht
+    auseinanderzuhalten. Kindernamen kennt die Anwendung nicht, und Startnummern
+    stehen hier bewusst nicht (Spezifikation 4.2).
+    """
+    stmt = (
+        select(PostenToken.token, Lauf.datum, Gruppe.name)
+        .join(Lauf, Lauf.id == PostenToken.lauf_id)
+        .join(Gruppe, Gruppe.id == Lauf.gruppe_id)
+        .where(
+            PostenToken.posten_id == zugang.token.posten_id,
+            PostenToken.lauf_id != zugang.lauf.id,
+            PostenToken.gueltig_bis > datetime.now(UTC),
+            Lauf.status.in_(("vorbereitet", "laufend")),
+        )
+        .order_by(Lauf.datum, Gruppe.name, Lauf.id)
+        .limit(MAX_WEITERE_LAEUFE)
+    )
+    return [
+        {"token": token, "datum": datum.isoformat(), "gruppe": gruppe}
+        for token, datum, gruppe in session.execute(stmt)
+    ]
+
+
 def _vorab(request: Request, token: str):
     """Ratenbegrenzung prüfen und Token auflösen. Liefert (session, zugang) oder Antwort."""
     if not _bremse(request).erlaubt(token):
@@ -136,6 +169,10 @@ def konfiguration(request: Request, token: str):
             ],
             # Ausschließlich Startnummern – keine Namen (Spezifikation 4.2).
             "startnummern": _startnummern(session, z.lauf.gruppe_id, nur_aktive=True),
+            # Für den Wechsel auf den nächsten Lauf ohne erneutes Scannen. Die App
+            # legt die Liste lokal ab: Nach dem Abschließen des Laufs ist dieses
+            # Token entwertet, und der Endpunkt antwortet dann mit 404.
+            "weitere_laeufe": _weitere_laeufe(session, z),
         }
         z.token.letzter_abruf = datetime.now(UTC)
         session.commit()

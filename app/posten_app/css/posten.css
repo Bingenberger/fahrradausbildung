@@ -415,3 +415,10 @@ button { font: inherit; color: inherit; }
 @media (max-width: 700px) {
   .statusleiste { flex-wrap: wrap; }
 }
+
+/* ------------------------------------------------------- Lauf wechseln */
+/* Zwei Klassen fahren dieselbe Strecke an einem Tag nacheinander. Der Wechsel
+   führt auf eine andere Adresse unter /p/ und bleibt damit in dieser App. */
+.laufwechsel-liste { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.laufwechsel-liste .knopf { flex: 1 1 260px; }
+.laufwechsel-hinweis { margin-top: 12px; }

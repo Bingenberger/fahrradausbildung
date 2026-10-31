@@ -162,7 +162,7 @@ async function konfigBestimmen(token) {
     if (gespeichert && !wechsel) {
       // Lauf abgeschlossen oder Zugang entwertet. Offene Daten nie verwerfen.
       if ((await speicher.anzahlNichtUebertragen()) === 0) {
-        await abschliessen();
+        await abschliessen(gespeichert);
         return null;
       }
       zustand.zugangUngueltig = true;
@@ -194,11 +194,51 @@ async function offlineVorbereiten() {
   anzeige.className = `status-offline ${erg.bereit ? "bereit" : "warnung"}`;
 }
 
+// ------------------------------------------------------------------ Lauf wechseln
+
+function datumKurz(iso) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+// Bietet die anderen Läufe dieses Postens an. Beide Adressen liegen im
+// Geltungsbereich /p/, deshalb bleibt der Wechsel in der installierten App –
+// es entsteht kein zweites Symbol auf dem Home-Bildschirm.
+function wechselAnbieten(bereichId, weitere) {
+  const bereich = $(bereichId);
+  bereich.hidden = !weitere || weitere.length === 0;
+  if (bereich.hidden) return;
+  const hinweis = $(bereichId + "-hinweis");
+  hinweis.hidden = true;
+  $(bereichId + "-liste").replaceChildren(
+    ...weitere.map((l) => {
+      const knopf = element("button", "knopf knopf-neben", `${l.gruppe} · ${datumKurz(l.datum)}`);
+      knopf.type = "button";
+      knopf.addEventListener("click", () => {
+        // Ohne Netz ließe sich die neue Klasse nicht laden – dann lieber nichts tun,
+        // als die eingerichtete App gegen eine leere einzutauschen.
+        if (!navigator.onLine) {
+          hinweis.hidden = false;
+          return;
+        }
+        location.replace("/p/" + l.token);
+      });
+      return knopf;
+    }),
+  );
+}
+
 // Alle Daten sind beim Server und der Lauf ist abgeschlossen: lokale Kopie löschen.
 // Nie vorher – solange der Lauf läuft, sind die lokalen Daten die einzige Kopie.
-async function abschliessen() {
+// ``konfig`` nur, wenn zustand.konfig noch nicht steht (Zugang beim Start ungültig).
+async function abschliessen(konfig) {
+  const weitere = ((konfig || zustand.konfig) || {}).weitere_laeufe;
   await speicher.allesLoeschen();
   await wach.loslassen();
+  wechselAnbieten("fertig-wechsel", weitere);
   zeige("fertig");
 }
 
@@ -252,6 +292,7 @@ function einrichtungZeigen() {
   $("prototyp-hinweis").hidden = !zustand.demo;
   const liste = $("einrichtung-items");
   liste.replaceChildren(...k.items.map((i) => element("li", "", i.kurzbezeichnung)));
+  wechselAnbieten("einrichtung-wechsel", k.weitere_laeufe);
   zeige("einrichtung");
 }
 

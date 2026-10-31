@@ -189,7 +189,9 @@ Funktionen:
    (`startnummer;vorname;nachname`). Startnummern innerhalb einer Gruppe eindeutig,
    Verstöße beim Import mit Zeilennummer melden.
 3. **Lauf anlegen** – Gruppe + Strecke + Datum wählen. Erzeugt automatisch für jeden
-   Posten ein Token.
+   Posten ein Token. Mehrere Klassen fahren dieselbe Strecke am selben Tag
+   nacheinander – an einer fünfzügigen Schule sind das zwei Läufe täglich.
+   Abgewiesen wird nur derselbe Lauf doppelt: eine Klasse, eine Strecke, ein Tag.
 4. **Posten-Blätter drucken** – eine PDF-Seite pro Posten mit: Postenname, QR-Code zur
    Token-URL, der Itemliste im Klartext, dem Datum und einem Hinweisfeld für die Eltern.
    Dieses Blatt geht mit dem iPad an den Posten.
@@ -280,9 +282,17 @@ Nur drei Endpunkte, alle ohne Login, ausschließlich über das Token autorisiert
 GET  /api/p/{token}/config
      → { lauf_id, datum, posten: {id, name},
          items: [{id, kurzbezeichnung, position}],
-         startnummern: [1,2,3,...] }
+         startnummern: [1,2,3,...],
+         weitere_laeufe: [{token, datum, gruppe}, ...] }
      404 bei unbekanntem, abgelaufenem oder entwertetem Token.
-     Enthält keine Namen.
+     Enthält keine Kindernamen.
+
+     weitere_laeufe nennt die anderen noch anstehenden Läufe an genau diesem
+     Posten. Damit wechselt die Person am Posten in der installierten App auf
+     den nächsten Lauf, statt den QR-Code erneut zu scannen – das legte sonst
+     je Lauf ein weiteres Symbol auf dem Home-Bildschirm an. Die
+     Klassenbezeichnung ist nötig, um zwei Läufe desselben Tages zu
+     unterscheiden; Startnummern fremder Läufe stehen nicht darin.
 
 POST /api/p/{token}/events
      Body: { events: [ {event_id, typ, startnummer, nutzlast, erfasst_am}, ... ] }

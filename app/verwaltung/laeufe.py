@@ -118,16 +118,17 @@ def _pruefen(repo: SchulRepository, strecke: Strecke, gruppe: Gruppe, datum: dat
         return "Die Gruppe hat keine aktiven Kinder."
     if token_ablauf(datum) <= datetime.now(UTC):
         return "Das Datum liegt in der Vergangenheit."
-    # OFFEN: Mehrere Gruppen gleichzeitig auf einer Strecke – Annahme: nein
-    # (siehe Index uq_lauf_strecke_datum_aktiv).
+    # Zwei Klassen nacheinander auf derselben Strecke sind der Normalfall; nur
+    # derselbe Lauf doppelt ist ein Versehen (Index uq_lauf_strecke_gruppe_datum_aktiv).
     belegt = repo.liste(
         Lauf,
         Lauf.strecke_id == strecke.id,
+        Lauf.gruppe_id == gruppe.id,
         Lauf.datum == datum,
         Lauf.status.in_(("vorbereitet", "laufend")),
     )
     if belegt:
-        return "Auf dieser Strecke gibt es an diesem Tag schon einen Lauf."
+        return "Für diese Gruppe gibt es auf dieser Strecke an diesem Tag schon einen Lauf."
     return None
 
 

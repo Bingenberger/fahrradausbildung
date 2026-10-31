@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from pypdf import PdfReader
 
-from app.modelle import Item, Kind, Lauf, Posten, PostenToken, Strecke
+from app.modelle import Gruppe, Item, Kind, Lauf, Posten, PostenToken, Strecke
 from app.token import token_ablauf, token_gueltig, token_url
 from tests.conftest import angemeldet
 
@@ -69,6 +69,31 @@ def test_lauf_anlegen_erzeugt_je_posten_ein_token(client, fabrik, schulen, strec
         assert all(len(t) >= 43 and re.fullmatch(r"[A-Za-z0-9_-]+", t) for t in tokens)
         assert all(t.gueltig_bis == token_ablauf(lauf.datum) for t in lauf.tokens)
         assert all(token_gueltig(t, lauf) for t in lauf.tokens)
+
+
+def test_zwei_klassen_fahren_dieselbe_strecke_am_selben_tag(client, fabrik, schulen, strecke_mit_drei_posten):
+    """An einer mehrzügigen Schule laufen pro Tag zwei Klassen nacheinander."""
+    a, _ = schulen
+    csrf = angemeldet(client, a.email)
+    with fabrik.intern_kontext() as s:
+        zweite = Gruppe(schule_id=a.schule, name="Klasse 4b", schuljahr="2026/27")
+        zweite.kinder.append(Kind(startnummer=1))
+        s.add(zweite)
+        s.flush()
+        zweite_id = zweite.id
+
+    erster = _lauf_id(_lauf_anlegen(client, csrf, strecke_mit_drei_posten, a.gruppe))
+    zweiter = _lauf_id(_lauf_anlegen(client, csrf, strecke_mit_drei_posten, zweite_id))
+    assert erster != zweiter
+    with fabrik.intern_kontext() as s:
+        laeufe = s.query(Lauf).filter(Lauf.strecke_id == strecke_mit_drei_posten).all()
+        assert {l.gruppe_id for l in laeufe} == {a.gruppe, zweite_id}
+        assert {l.datum.isoformat() for l in laeufe} == {ZUKUNFT}
+
+    # Dieselbe Klasse ein zweites Mal bleibt ein Versehen und wird abgewiesen.
+    _lauf_anlegen(client, csrf, strecke_mit_drei_posten, a.gruppe)
+    with fabrik.intern_kontext() as s:
+        assert s.query(Lauf).filter(Lauf.strecke_id == strecke_mit_drei_posten).count() == 2
 
 
 @pytest.mark.parametrize("fall", ["archiviert", "ohne_items", "ohne_kinder", "vergangenheit", "doppelt"])

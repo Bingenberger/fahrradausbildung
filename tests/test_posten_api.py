@@ -77,7 +77,7 @@ def test_konfiguration(client, fabrik, lauf):
     assert r.status_code == 200
     assert r.headers["cache-control"] == "no-store"
     k = r.json()
-    assert set(k) == {"lauf_id", "datum", "posten", "items", "startnummern"}
+    assert set(k) == {"lauf_id", "datum", "posten", "items", "startnummern", "weitere_laeufe"}
     assert k["lauf_id"] == lauf["lauf_id"]
     assert k["datum"] == date.today().isoformat()
     assert k["posten"] == {"id": lauf["posten_id"], "name": "Kreuzung"}
@@ -89,10 +89,94 @@ def test_konfiguration(client, fabrik, lauf):
 
 
 def test_konfiguration_enthaelt_keine_namen(client, fabrik, lauf):
-    """Spezifikation 4.2: weder Gruppe noch Schule; Kindernamen gibt es in der Anwendung nicht."""
+    """Spezifikation 4.2: weder Gruppe noch Schule; Kindernamen gibt es in der Anwendung nicht.
+
+    Einzige Ausnahme ist die Klassenbezeichnung *anderer* Läufe in
+    ``weitere_laeufe`` – ohne sie kann die Person am Posten zwei Läufe desselben
+    Tages nicht auseinanderhalten (siehe test_weitere_laeufe_nennen_tag_und_klasse).
+    """
     text = client.get(f"/api/p/{lauf['token']}/config").text
     for name in lauf["namen"]:
         assert name not in text
+
+
+# ----------------------------------------------------------- Wechsel auf den nächsten Lauf
+
+
+def _zweiter_lauf(fabrik, schulen, lauf, *, datum=None, posten_id=None, status="vorbereitet"):
+    """Weiterer Lauf einer anderen Klasse – standardmäßig am selben Posten und Tag."""
+    a, _ = schulen
+    with fabrik.intern_kontext() as s:
+        gruppe = Gruppe(schule_id=a.schule, name="Klasse 4b", schuljahr="2026/27")
+        gruppe.kinder.append(Kind(startnummer=1))
+        s.add(gruppe)
+        s.flush()
+        strecke_id = s.execute(
+            select(Posten.strecke_id).where(Posten.id == (posten_id or lauf["posten_id"]))
+        ).scalar_one()
+        zweiter = Lauf(
+            schule_id=a.schule, strecke_id=strecke_id, gruppe_id=gruppe.id,
+            datum=datum or date.today(), status=status,
+        )
+        s.add(zweiter)
+        s.flush()
+        token = PostenToken(
+            lauf_id=zweiter.id, posten_id=posten_id or lauf["posten_id"],
+            token=neues_token(), gueltig_bis=token_ablauf(zweiter.datum),
+        )
+        s.add(token)
+        s.flush()
+        return {"token": token.token, "lauf_id": zweiter.id}
+
+
+def test_weitere_laeufe_nennen_tag_und_klasse(client, fabrik, schulen, lauf):
+    """Zwei Läufe am selben Tag: Nur die Klasse unterscheidet sie."""
+    zweiter = _zweiter_lauf(fabrik, schulen, lauf)
+    k = client.get(f"/api/p/{lauf['token']}/config").json()
+    assert k["weitere_laeufe"] == [
+        {"token": zweiter["token"], "datum": date.today().isoformat(), "gruppe": "Klasse 4b"}
+    ]
+    # Startnummern fremder Läufe gehören nicht auf das Gerät.
+    assert all(set(e) == {"token", "datum", "gruppe"} for e in k["weitere_laeufe"])
+
+
+def test_weitere_laeufe_fuehren_nicht_den_eigenen_lauf(client, fabrik, lauf):
+    k = client.get(f"/api/p/{lauf['token']}/config").json()
+    assert k["weitere_laeufe"] == []
+
+
+@pytest.mark.parametrize("fall", ["abgeschlossen", "archiviert", "anderer_posten", "token_abgelaufen"])
+def test_weitere_laeufe_lassen_unerreichbares_weg(client, fabrik, schulen, lauf, fall):
+    a, _ = schulen
+    if fall == "anderer_posten":
+        with fabrik.intern_kontext() as s:
+            strecke = Strecke(schule_id=a.schule, name="Andere Runde")
+            posten = Posten(name="Ampel", position=1)
+            strecke.posten.append(posten)
+            s.add(strecke)
+            s.flush()
+            fremder_posten = posten.id
+        _zweiter_lauf(fabrik, schulen, lauf, posten_id=fremder_posten)
+    elif fall == "token_abgelaufen":
+        zweiter = _zweiter_lauf(fabrik, schulen, lauf)
+        with fabrik.intern_kontext() as s:
+            pt = s.execute(select(PostenToken).where(PostenToken.token == zweiter["token"])).scalar_one()
+            pt.gueltig_bis = datetime.now(UTC) - timedelta(minutes=1)
+    else:
+        _zweiter_lauf(fabrik, schulen, lauf, status=fall)
+
+    assert client.get(f"/api/p/{lauf['token']}/config").json()["weitere_laeufe"] == []
+
+
+def test_angebotenes_token_traegt_wirklich_in_den_anderen_lauf(client, fabrik, schulen, lauf):
+    """Der Wechsel muss funktionieren, sonst steht die Person am Posten ohne App da."""
+    zweiter = _zweiter_lauf(fabrik, schulen, lauf)
+    k = client.get(f"/api/p/{lauf['token']}/config").json()
+    anderes = k["weitere_laeufe"][0]["token"]
+    neu = client.get(f"/api/p/{anderes}/config").json()
+    assert neu["lauf_id"] == zweiter["lauf_id"] != lauf["lauf_id"]
+    assert neu["posten"]["id"] == lauf["posten_id"]  # derselbe Posten
+    assert neu["startnummern"] == [1]  # Klasse 4b hat nur ein Kind
 
 
 @pytest.mark.parametrize("fall", ["unbekannt", "abgelaufen", "abgeschlossen", "archiviert", "zu_kurz"])

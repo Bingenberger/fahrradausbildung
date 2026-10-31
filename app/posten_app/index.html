@@ -33,6 +33,15 @@
     <p class="gross">✓ Alle Erfassungen sind übertragen.</p>
     <p id="fertig-text">Der Lauf ist abgeschlossen. Die Daten wurden von diesem iPad gelöscht.
       Danke für Ihre Hilfe!</p>
+
+    <div class="laufwechsel" id="fertig-wechsel" hidden>
+      <h2>Nächster Lauf an diesem Posten</h2>
+      <p>Wählen Sie die Klasse, die jetzt dran ist. Der QR-Code muss nicht erneut
+        gescannt werden – so bleibt es bei einem Symbol auf dem Home-Bildschirm.</p>
+      <div class="laufwechsel-liste" id="fertig-wechsel-liste"></div>
+      <p class="laufwechsel-hinweis" id="fertig-wechsel-hinweis" hidden>
+        Zum Wechseln muss das iPad im WLAN sein.</p>
+    </div>
   </div>
 
   <!-- Einrichtung: am Vortag im WLAN -->
@@ -44,14 +53,14 @@
 
     <div class="anleitung" id="anleitung-installieren">
       <h2>Einmal zum Home-Bildschirm hinzufügen</h2>
-      <p>Tippe oben auf <strong>Teilen</strong> (das Quadrat mit dem Pfeil)
+      <p>Tippen Sie oben auf <strong>Teilen</strong> (das Quadrat mit dem Pfeil)
         und dann auf <strong>Zum Home-Bildschirm</strong>.</p>
-      <p>Öffne die App danach über das neue Symbol auf dem Home-Bildschirm.
+      <p>Öffnen Sie die App danach über das neue Symbol auf dem Home-Bildschirm.
         Dann funktioniert sie auch ohne Internet.</p>
     </div>
 
     <div class="anleitung">
-      <h2>So geht’s an deinem Posten</h2>
+      <h2>So geht’s an Ihrem Posten</h2>
       <ol>
         <li>Oben steht groß die Nummer des Kindes, das als Nächstes kommt.</li>
         <li>Hat das Kind alles richtig gemacht: <strong>Weiter</strong> tippen. Fertig.</li>
@@ -61,6 +70,15 @@
       </ol>
       <p>Darauf achten Sie an diesem Posten:</p>
       <ul id="einrichtung-items"></ul>
+    </div>
+
+    <div class="anleitung laufwechsel" id="einrichtung-wechsel" hidden>
+      <h2>Ist eine andere Klasse dran?</h2>
+      <p>An diesem Posten stehen weitere Läufe an. Hier wechseln – der QR-Code muss
+        nicht erneut gescannt werden.</p>
+      <div class="laufwechsel-liste" id="einrichtung-wechsel-liste"></div>
+      <p class="laufwechsel-hinweis" id="einrichtung-wechsel-hinweis" hidden>
+        Zum Wechseln muss das iPad im WLAN sein.</p>
     </div>
 
     <button type="button" class="knopf knopf-haupt" id="start">Prüfung starten</button>
@@ -114,7 +132,7 @@
     </main>
 
     <main id="ansicht-sicherheit" class="sicherheit" role="tabpanel" hidden>
-      <p class="hinweis">Tippe auf eine Nummer. Jedes Kind bekommt <strong>eine</strong> Einschätzung.
+      <p class="hinweis">Tippen Sie auf eine Nummer. Jedes Kind bekommt <strong>eine</strong> Einschätzung.
         Sie können sie jederzeit ändern.</p>
       <div class="raster" id="sicherheit-raster"></div>
     </main>

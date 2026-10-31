@@ -343,12 +343,16 @@ class Lauf(Mandantenmodell, Basis):
     __tablename__ = "lauf"
     __table_args__ = (
         CheckConstraint(f"status IN ({_in_list(LAUF_STATUS)})", name="status"),
-        # OFFEN: Mehrere Gruppen gleichzeitig auf einer Strecke – Annahme: nein,
-        # höchstens ein aktiver Lauf pro Strecke und Tag. Falls doch nötig, müssen
-        # Startnummern über Gruppen hinweg eindeutig sein und dieser Index entfällt.
+        # Mehrere Klassen fahren dieselbe Strecke am selben Tag nacheinander – an
+        # einer fünfzügigen Schule sind das zwei Läufe täglich. Verhindert wird nur
+        # noch derselbe Lauf doppelt: eine Klasse, eine Strecke, ein Tag.
+        # Die Eindeutigkeit der Startnummern bleibt dabei gewahrt, weil ein Token
+        # genau einen Lauf adressiert und das Gerät am Posten immer nur in einem
+        # Lauf erfasst (app/posten/api.py, „weitere_laeufe").
         Index(
-            "uq_lauf_strecke_datum_aktiv",
+            "uq_lauf_strecke_gruppe_datum_aktiv",
             "strecke_id",
+            "gruppe_id",
             "datum",
             unique=True,
             postgresql_where=text("status IN ('vorbereitet', 'laufend')"),
