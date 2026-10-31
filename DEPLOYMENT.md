@@ -53,6 +53,66 @@ docker compose exec app python -m app.kommandos systemadmin-anlegen admin@exampl
 Beim Start bringt der Container die Datenbank automatisch auf den neuesten Stand
 (`alembic upgrade head`).
 
+### Besonderheit: Docker in einem LXC-Container (Proxmox)
+
+Die Anwendung läuft in einem LXC-Container, aber Docker braucht dort Rechte, die ein
+unprivilegierter Container nicht von sich aus hat. Auf dem Proxmox-Host gehört in
+`/etc/pve/lxc/<ID>.conf`:
+
+```
+features: nesting=1,keyctl=1
+```
+
+Danach den Container neu starten. Zwei Fallen kosten sonst einen Abend Fehlersuche:
+
+**1. Firewall-Dienste räumen Dockers Netzwerkregeln weg.** Debian aktiviert
+`nftables.service` mitunter von sich aus. Dessen `/etc/nftables.conf` beginnt mit
+`flush ruleset` – und weil `iptables` im `nft`-Modus arbeitet, löscht dieser Befehl
+auch Dockers Ketten. Docker legt sie wenige Sekunden nach dem Systemstart an, der
+Firewall-Dienst startet danach und wischt sie weg. Im Protokoll steht kein Fehler,
+denn Docker hat korrekt gearbeitet; ihm wurde nur hinterher der Boden entzogen.
+
+Das Fehlerbild wandert weit vom Verursacher weg: Der Build bricht in `apt-get update`
+ab mit `Temporary failure resolving 'deb.debian.org'`, jeder Versuch nach genau 30
+Sekunden. Image-Pulls funktionieren trotzdem, weil die der Docker-Dienst selbst
+ausführt und dafür kein NAT braucht. Nur Container kommen nicht hinaus.
+
+Prüfen – in dieser Reihenfolge, jeder Schritt schließt eine Ursache aus:
+
+```bash
+docker info | grep -A2 "Storage Driver"      # overlay2 erwartet; vfs wäre nur sehr langsam
+sysctl net.ipv4.ip_forward                   # muss 1 sein
+iptables -t nat -S POSTROUTING | grep -i masq   # MASQUERADE-Regel für 172.17.0.0/16?
+iptables -t nat -S | grep -c DOCKER          # muss > 0 sein
+docker run --rm busybox ping -c2 -W2 <IP des Gateways>
+systemctl is-enabled nftables ufw
+```
+
+Fehlen die `DOCKER`-Ketten, scheitert auch `docker network create` mit
+`Unable to enable SKIP DNAT rule: … No chain/target/match by that name` – und damit
+jedes `docker compose up`, weil Compose ein eigenes Netz anlegt.
+
+Behebung, wenn im Container keine Firewall gebraucht wird (hinter einem Router und der
+Proxmox-Host-Firewall ist das der Normalfall; `ufw status` zeigt dann `inactive`):
+
+```bash
+systemctl disable --now nftables ufw
+systemctl restart docker                     # erst danach, der Stop-Befehl flusht erneut
+iptables -t nat -S | grep -c DOCKER          # jetzt > 0
+```
+
+Wird eine Firewall gebraucht, bleibt sie – dann muss Docker nach ihr starten:
+`systemctl edit docker` mit `[Unit]` / `After=nftables.service ufw.service`.
+Der eigentliche Test ist in beiden Fällen ein Neustart des Containers: danach müssen
+die Ketten noch stehen.
+
+**2. Dateirechte gehen beim Kopieren verloren.** Kommt der Quellbaum nicht per
+`git clone`, sondern über eine Windows-Freigabe, `scp` oder ein neu gepacktes Archiv,
+fehlt den Skripten das Ausführungsbit. Das `Dockerfile` setzt es für `docker/start.sh`
+inzwischen selbst (`chmod 0755`), damit ein Image nicht davon abhängt. Zeigt ein
+Container trotzdem `exec … permission denied`, ist `chmod +x` auf die betroffene Datei
+und ein `docker compose build` die Lösung.
+
 ## 3. nginx und HTTPS
 
 ```bash
@@ -81,6 +141,34 @@ Was die Beispielkonfiguration bewusst tut:
 
 Test: `curl -sI https://fahrrad.example.org/anmelden` zeigt u. a.
 `strict-transport-security` und `content-security-policy`.
+
+### Proxy auf einem anderen Rechner
+
+Standardmäßig veröffentlicht `docker-compose.yml` den Port nur auf `127.0.0.1` – das
+setzt voraus, dass nginx auf demselben Host läuft. Terminiert HTTPS auf einem anderen
+Rechner (etwa ein öffentlicher Server, der per VPN zum Heimserver tunnelt), müssen zwei
+Werte in die `.env`:
+
+| Variable | Wert |
+|---|---|
+| `FP_BIND` | Adresse, über die der Proxy die App erreicht, z. B. `192.168.178.103` |
+| `FP_PROXY_IPS` | Adresse des Proxys, wie die App sie sieht – mehrere mit Komma, CIDR erlaubt |
+
+`FP_PROXY_IPS` ist dabei nicht optional. Der Vorgabewert `*` heißt „jedem
+`X-Forwarded-For`-Header glauben" und ist nur deshalb unbedenklich, weil an
+`127.0.0.1` niemand von außen herankommt. Sobald der Port im Netz liegt, könnte jedes
+Gerät dort die Anmeldebremse umgehen, indem es bei jedem Fehlversuch eine andere IP
+behauptet – und in den Protokollen stünde die erfundene Adresse.
+
+Welchen Wert die App tatsächlich sieht, verrät sie selbst: `FP_PROXY_IPS` vorübergehend
+auf eine falsche Adresse setzen, `docker compose up -d`, die Seite über den Proxy
+aufrufen und `docker compose logs app --tail=20` ansehen. Weil der Header dann nicht
+geglaubt wird, protokolliert uvicorn die echte Gegenstelle.
+
+Zu bedenken: Mit gesetztem `FP_BIND` ist die App für jedes Gerät im selben Netz
+unverschlüsselt und am Proxy vorbei erreichbar. Soll das nicht sein, gehört ein
+zweiter nginx auf den Host, der auf der Netzadresse lauscht und auf `127.0.0.1`
+weiterleitet; dann bleibt `FP_BIND` leer und `FP_PROXY_IPS` auf `*`.
 
 ### Ausgehende Verbindungen
 
@@ -176,6 +264,10 @@ eingebunden. Aufbau und Beispiele: README, Abschnitt „Feedbackbogen anpassen".
 | Anmeldung „zu viele Versuche" für alle gleichzeitig | nginx setzt `X-Forwarded-For` nicht – alle Anfragen haben dieselbe IP |
 | Anmeldung klappt, aber man landet wieder auf der Anmeldeseite | Aufruf über `http://` mit `FP_COOKIE_SECURE=true` – über HTTPS aufrufen |
 | `KeyError: 'ContainerConfig'` | altes `docker-compose` 1.x; das Compose-Plugin (`docker compose`) verwenden |
+| Build bricht ab: `Temporary failure resolving 'deb.debian.org'` | Container kommen nicht ins Netz, meist in LXC – siehe „Docker in einem LXC-Container" |
+| `docker network create` meldet `No chain/target/match by that name` | Dockers iptables-Ketten fehlen; gleiche Ursache wie oben |
+| `exec /usr/local/bin/start.sh: permission denied` | Ausführungsbit beim Kopieren verloren: `chmod +x docker/start.sh`, dann `docker compose up -d --build` |
+| Proxy auf einem anderen Rechner erreicht die App nicht | Port liegt nur auf `127.0.0.1`: `FP_BIND` setzen – siehe „Proxy auf einem anderen Rechner" |
 
 ## 10. Bewusste Grenzen
 

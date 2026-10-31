@@ -27,7 +27,10 @@ COPY migrations ./migrations
 COPY app ./app
 COPY docker/start.sh /usr/local/bin/start.sh
 
-RUN useradd --system --uid 10001 --no-create-home fahrrad \
+# chmod: Das x-Bit von start.sh kann beim Kopieren des Quellbaums verloren gehen
+# (SMB-Freigabe, Archiv) – ohne es startet der Container nicht.
+RUN chmod 0755 /usr/local/bin/start.sh \
+ && useradd --system --uid 10001 --no-create-home fahrrad \
  && mkdir -p /var/cache/fahrrad && chown fahrrad /var/cache/fahrrad
 USER fahrrad
 

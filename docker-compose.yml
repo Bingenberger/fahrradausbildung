@@ -32,14 +32,19 @@ services:
       # Überschreibt den Wert aus .env: Im Compose-Netz heißt die Datenbank „db".
       FP_DATABASE_URL: postgresql+psycopg://fahrrad:${POSTGRES_PASSWORD}@db:5432/fahrrad
       FP_VORLAGEN_VERZEICHNIS: /vorlagen
-      # X-Forwarded-For nur von nginx glauben. „*" ist hier unbedenklich, weil der
-      # Port ausschließlich auf 127.0.0.1 veröffentlicht ist (siehe ports).
-      FORWARDED_ALLOW_IPS: "*"
+      # X-Forwarded-For nur von nginx glauben. „*" ist unbedenklich, solange der Port
+      # auf 127.0.0.1 liegt – dort kommt niemand von außen hin. Wird FP_BIND geöffnet,
+      # MUSS hier die Adresse des Proxys stehen (FP_PROXY_IPS), sonst kann jeder, der
+      # den Port erreicht, mit erfundenem X-Forwarded-For die Anmeldebremse umgehen.
+      FORWARDED_ALLOW_IPS: "${FP_PROXY_IPS:-*}"
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${FP_PORT:-8000}:8000"
+      # Vorgabe: nur über 127.0.0.1 erreichbar, für nginx auf demselben Host. Sitzt der
+      # Proxy auf einem anderen Rechner (z. B. über VPN), FP_BIND in der .env auf die
+      # Adresse setzen, über die er die App erreicht – und FP_PROXY_IPS mitsetzen.
+      - "${FP_BIND:-127.0.0.1}:${FP_PORT:-8000}:8000"
     volumes:
       # Eigene Feedbackbogen-Vorlagen und Logos je Schule (README: „Feedbackbogen anpassen").
       - ./vorlagen:/vorlagen:ro
