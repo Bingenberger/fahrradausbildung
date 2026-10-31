@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
@@ -283,8 +284,17 @@ def test_auswertung_einzelnes_kind(client, fabrik, schulen, lauf):
     assert "bremst spät" in html
     assert "teilweise sicher" in html
     assert "Keine Durchgänge erfasst." in html  # Kreisel
-    assert f"/kinder/{lauf['kinder'][1]}\">‹ Nr. 1" in html
-    assert f"/kinder/{lauf['kinder'][3]}\">Nr. 3 ›" in html
+    # Blätternavigation: seit der Überarbeitung tragen die Verweise Pfeilsymbole
+    # statt der Zeichen ‹ und ›, deshalb wird der Inhalt des Verweises geprüft.
+    def _verweis(kind_id: int) -> str:
+        treffer = re.search(rf'/kinder/{kind_id}">(.*?)</a>', html, re.S)
+        assert treffer, f"kein Verweis auf Kind {kind_id}"
+        return " ".join(treffer.group(1).split())
+
+    assert "Nr. 1" in _verweis(lauf["kinder"][1])
+    assert "Nr. 3" in _verweis(lauf["kinder"][3])
+    # Das vorherige Kind steht vor dem nächsten.
+    assert html.index(f'/kinder/{lauf["kinder"][1]}"') < html.index(f'/kinder/{lauf["kinder"][3]}"')
 
 
 def test_auswertung_kind_aus_anderer_gruppe_oder_inaktiv_ohne_daten_404(client, schulen, lauf):

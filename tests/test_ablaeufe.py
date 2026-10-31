@@ -109,18 +109,19 @@ def test_ablauf_einfuegen_kopiert_schritte(client, fabrik, schulen, freier_poste
         links_id, erwartet = links.id, [(x.kurzbezeichnung, x.beobachtungstext, x.uebungstext) for x in links.schritte]
 
     html = client.get(f"/verwaltung/posten/{freier_posten}").text
-    assert "Linksabbiegen (6 Schritte)" in html
+    assert f"Linksabbiegen ({len(erwartet)} Schritte)" in html
     r = client.post(f"/verwaltung/posten/{freier_posten}/ablauf-einfuegen", data={"ablauf_id": str(links_id), "csrf": csrf})
     assert r.status_code == 303
     meldung = client.get(r.headers["location"]).text
-    assert "„Linksabbiegen“ eingefügt: 5 Items." in meldung
+    # Ein Schritt ist am Posten schon vorhanden und wird übersprungen.
+    assert f"„Linksabbiegen“ eingefügt: {len(erwartet) - 1} Items." in meldung
     assert "Schon vorhanden und übersprungen: Handzeichen links." in meldung
 
     items = _items(fabrik, freier_posten)
     # Das vorhandene Item bleibt mit seinem eigenen Text vorne; die übrigen kommen dahinter.
     assert items[0] == ("Handzeichen links", "eigener Text", "", 1)
     assert [i[:3] for i in items[1:]] == [e for e in erwartet if e[0] != "Handzeichen links"]
-    assert [i[3] for i in items] == list(range(1, 7))
+    assert [i[3] for i in items] == list(range(1, len(erwartet) + 1))
 
     # Kopie, keine Verknüpfung: Änderungen am Ablauf ändern den Posten nicht.
     with fabrik.intern_kontext() as s:

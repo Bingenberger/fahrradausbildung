@@ -124,7 +124,9 @@ def test_laufseite_erklaert_geloeschte_erfassungen(client, fabrik, schulen):
     erfassungen_loeschen(fabrik, 12)
     angemeldet(client, a.email)
     for pfad in (f"/verwaltung/laeufe/{alt}", f"/verwaltung/laeufe/{alt}/auswertung"):
-        assert "nach Ablauf der Aufbewahrungsfrist gelöscht" in client.get(pfad).text
+        # Leerraum normalisieren: In den Vorlagen darf der Satz umbrochen sein.
+        text = " ".join(client.get(pfad).text.split())
+        assert "nach Ablauf der Aufbewahrungsfrist gelöscht" in text
 
 
 # --------------------------------------------------------------------------- Export

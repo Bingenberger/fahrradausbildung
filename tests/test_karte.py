@@ -413,6 +413,16 @@ def _strecke_mit_posten(fabrik, schule, mit_ort=True) -> int:
         return strecke.id
 
 
+def _bildnamen(seiten) -> set[str]:
+    """Die verschiedenen Bilder des Dokuments.
+
+    WeasyPrint gibt allen Seiten ein gemeinsames Ressourcen-Verzeichnis, deshalb
+    meldet pypdf auf jeder Seite alle Bilder des PDFs. Zählbar ist daher nur, wie
+    viele verschiedene Bilder darin stecken – nicht, wie viele je Seite.
+    """
+    return {bild.name for seite in seiten for bild in seite.images}
+
+
 def _plan(client, strecke_id):
     antwort = client.get(f"/verwaltung/strecken/{strecke_id}/streckenplan.pdf")
     assert antwort.status_code == 200
@@ -432,14 +442,15 @@ def test_streckenplan_hat_uebersicht_und_je_posten_eine_nahaufnahme(client, fabr
     assert "Streckenplan" in uebersicht and "Streckenplan-Runde" in uebersicht
     assert "Länge der Strecke" in uebersicht and "km" in uebersicht
     assert "Einmündung 3" in uebersicht and "50.823" in uebersicht
-    assert len(seiten[0].images) == 1
 
     for nummer, seite in enumerate(seiten[1:], 1):
         text = " ".join(seite.extract_text().split())
         assert f"Einmündung {nummer}" in text and f"Posten {nummer} von 3" in text
         assert f"Zoomstufe {kb.ZOOM_POSTEN}" in text
         assert "Schulterblick vor dem Abbiegen?" in text
-        assert len(seite.images) == 1
+
+    # Übersichtskarte und je Posten eine Nahaufnahme.
+    assert len(_bildnamen(seiten)) == 4
 
     zoomstufen = {int(u.split("/")[3]) for u in kacheln}
     assert kb.ZOOM_POSTEN in zoomstufen  # Nahaufnahmen
@@ -455,9 +466,9 @@ def test_streckenplan_nennt_posten_ohne_standort(client, fabrik, schulen, kachel
     assert "ohne Standort" in " ".join(seiten[0].extract_text().split())
     for seite in seiten[1:]:
         assert "noch keinen Standort" in " ".join(seite.extract_text().split())
-        assert not seite.images
-    # Der Verlauf allein ergibt die Übersichtskarte
-    assert len(seiten[0].images) == 1
+    # Der Verlauf allein ergibt die Übersichtskarte; Nahaufnahmen gibt es ohne
+    # Standort nicht, also steckt genau ein Bild im Dokument.
+    assert len(_bildnamen(seiten)) == 1
 
 
 def test_streckenplan_bleibt_druckbar_wenn_kachelserver_ausfaellt(client, fabrik, schulen, kacheln, monkeypatch):

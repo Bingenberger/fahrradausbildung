@@ -27,4 +27,6 @@ def test_compose_benannte_volumes_und_nur_lokaler_port():
     assert "pgdata:/var/lib/postgresql/data" in text
     assert re.search(r"^volumes:\n  pgdata:", text, flags=re.M)
     assert "postgres:16" in text
-    assert '"127.0.0.1:' in text
+    # Ohne Zutun zeigt die veröffentlichte Adresse auf Loopback. FP_BIND öffnet den
+    # Port bewusst für einen Proxy auf einem anderen Rechner (DEPLOYMENT.md).
+    assert '"${FP_BIND:-127.0.0.1}:${FP_PORT:-8000}:8000"' in text

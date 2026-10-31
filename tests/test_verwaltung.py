@@ -199,7 +199,7 @@ def _datei(strecke: dict) -> bytes:
 def test_strecke_importieren_legt_neue_strecke_an(client, fabrik, schulen):
     """Export der einen Schule, Import in der anderen – beide Richtungen müssen zusammenpassen."""
     a, b = schulen
-    angemeldet(client, b.email)
+    csrf_b = angemeldet(client, b.email)
     with fabrik.intern_kontext() as s:
         strecke = s.get(Strecke, b.strecke)
         strecke.beschreibung = "Start am Schultor."
@@ -217,6 +217,7 @@ def test_strecke_importieren_legt_neue_strecke_an(client, fabrik, schulen):
         s.add(zweiter)
     datei = client.get(f"/verwaltung/strecken/{b.strecke}/export.json").content
 
+    client.post("/abmelden", data={"csrf": csrf_b})  # sonst bleibt die Sitzung von B aktiv
     csrf = angemeldet(client, a.email)
     neu = _neue_id(_importieren(client, csrf, datei), "strecken")
 
