@@ -340,7 +340,7 @@ def test_postenblatt_mit_karte_bleibt_eine_seite(client, fabrik, schulen, kachel
     assert len(seiten) == 3
     for seite in seiten:
         text = " ".join(seite.extract_text().split())
-        assert "Dein Standort" in text
+        assert "Ihr Standort" in text
         assert "Punkt 4" in text and "Hinweise" in text
         assert len(seite.images) >= 1
 
@@ -365,7 +365,7 @@ def test_postenblatt_ohne_karte_wenn_kachelserver_ausfaellt(client, fabrik, schu
     antwort = client.get(f"/verwaltung/laeufe/{lauf_id}/postenblaetter.pdf")
     assert antwort.status_code == 200
     text = PdfReader(io.BytesIO(antwort.content)).pages[0].extract_text()
-    assert "Dein Standort" not in text
+    assert "Ihr Standort" not in text
 
 
 # --------------------------------------------------------------------------- Streckenplan

@@ -1,4 +1,5 @@
-/* Feedbackbogen: eine A4-Seite je Kind. Austauschbar je Schule. */
+/* Feedbackbogen: in der Regel eine A4-Seite je Kind, bei viel Inhalt zwei.
+   Austauschbar je Schule. */
 
 @page { size: A4; margin: 15mm 18mm 14mm 18mm; }
 
@@ -16,6 +17,12 @@ body {
   flex-direction: column;
 }
 .bogen:last-child { page-break-after: auto; }
+
+/* Die feste Seitenhöhe hält die Fußzeile unten. Ohne flex-shrink: 0 staucht
+   WeasyPrint stattdessen die Abschnitte: Ihr Kasten wird kleiner als ihr Text,
+   und der läuft sichtbar in den nächsten Abschnitt hinein. Nachgeben darf nur
+   das Schreibfeld der Lehrkraft – es ist das Einzige, dessen Höhe frei ist. */
+.kopf, h1, .wer, .einleitung, .abschnitt, .fuss { flex-shrink: 0; }
 
 .kopf {
   display: flex;
@@ -39,14 +46,23 @@ h1 { font-size: 22pt; margin: 8mm 0 0; }
 h2 { font-size: 15pt; margin: 0 0 2mm; }
 
 .gut ul { list-style: none; margin: 0; padding: 0; }
-.gut ul.zweispaltig { columns: 2; column-gap: 8mm; }
+/* Mehrspaltig über flex statt über „columns": Letzteres beansprucht in
+   WeasyPrint die volle verfügbare Höhe und reißt ein Loch in den Bogen.
+   Die dritte Spalte kommt erst bei langen Listen – eine Strecke mit vielen
+   Posten bringt leicht zwanzig Haken zusammen, und der Bogen bleibt einseitig. */
+.gut ul.zweispaltig, .gut ul.dreispaltig { display: flex; flex-wrap: wrap; }
+.gut ul.zweispaltig li, .gut ul.dreispaltig li { box-sizing: border-box; padding-right: 4mm; }
+.gut ul.zweispaltig li { width: 50%; }
+.gut ul.dreispaltig { font-size: 11.5pt; }
+.gut ul.dreispaltig li { width: 33.33%; padding-left: 6mm; text-indent: -6mm; }
+.gut ul.dreispaltig li::before { width: 6mm; }
 .gut li { break-inside: avoid; padding-left: 8mm; text-indent: -8mm; margin: 1mm 0; }
 .gut li::before { content: "✓"; display: inline-block; width: 8mm; text-indent: 0; font-weight: bold; }
 
 .ueben ol { margin: 0; padding-left: 7mm; }
 .ueben li { margin: 2mm 0; }
 
-.lehrkraft { margin-top: 7mm; flex: 1; display: flex; flex-direction: column; }
+.lehrkraft { margin-top: 7mm; flex: 1 1 auto; display: flex; flex-direction: column; }
 .schreibfeld {
   flex: 1;
   min-height: 40mm;

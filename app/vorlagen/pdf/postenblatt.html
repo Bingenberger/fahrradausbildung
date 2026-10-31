@@ -18,7 +18,7 @@
   {% if b.karte %}
     <figure class="standort">
       <img src="{{ b.karte }}" alt="Kartenausschnitt mit dem Standort des Postens">
-      <figcaption>Dein Standort: der gelbe Punkt {{ b.nummer }}. Rot: die Strecke der Kinder.</figcaption>
+      <figcaption>Ihr Standort: der gelbe Punkt {{ b.nummer }}. Rot: die Strecke der Kinder.</figcaption>
     </figure>
   {% endif %}
 
@@ -36,7 +36,7 @@
     </div>
   </div>
 
-  <h2>Darauf achtest du an diesem Posten</h2>
+  <h2>Darauf achten Sie an diesem Posten</h2>
   <table class="items">
     {% for i in b.posten.items %}
       <tr>
@@ -46,21 +46,21 @@
     {% endfor %}
   </table>
 
-  <h2>So erfasst du</h2>
+  <h2>So erfassen Sie</h2>
   <ul class="bedienung">
     <li>Oben steht groß die Nummer des Kindes, das als Nächstes kommt.</li>
     <li>Alles richtig gemacht: <strong>Weiter</strong> tippen.</li>
     <li>Etwas vergessen: den Punkt antippen (wird rot), dann <strong>Weiter</strong>.</li>
     <li>Ein anderes Kind kommt: <strong>andere Nummer</strong>. Vertippt: <strong>Rückgängig</strong>.</li>
     <li>Zum Reiter <strong>Fahrsicherheit</strong>: jedem Kind einmal sicher / teilweise sicher / unsicher geben.</li>
-    <li>Achte immer zuerst auf den Verkehr. Ein verpasstes Kind ist kein Problem.</li>
+    <li>Achten Sie immer zuerst auf den Verkehr. Ein verpasstes Kind ist kein Problem.</li>
   </ul>
 
   <h2>Hinweise</h2>
   <div class="hinweisfeld"></div>
 
   <footer class="fuss">
-    Bitte gib dieses Blatt nach der Prüfung zusammen mit dem iPad zurück –
+    Bitte geben Sie dieses Blatt nach der Prüfung zusammen mit dem iPad zurück –
     der QR-Code ist der Zugang zu diesem Posten. Das iPad erst nach der Rückgabe ins WLAN bringen.
   </footer>
 </section>

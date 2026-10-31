@@ -81,7 +81,10 @@ def _rendern(vorlage: str, stylesheet: str, **kontext) -> bytes:
 
 
 def feedbackboegen_pdf(schule: Schule, lauf: Lauf, boegen: list[dict]) -> bytes:
-    """Feedbackbögen, eine Seite je Eintrag in ``boegen`` ({"kind", "feedback"}).
+    """Feedbackbögen, je Eintrag in ``boegen`` ({"kind", "feedback"}) ein Bogen.
+
+    Ein Bogen füllt in der Regel eine A4-Seite; bei vielen Haken und drei
+    ausführlichen Übungstexten bricht er auf eine zweite um.
 
     Vorlage, Stylesheet und Logo kommen aus dem Schulordner, dem gemeinsamen
     Ordner oder – falls dort nichts liegt – aus ``app/vorlagen/pdf/``.

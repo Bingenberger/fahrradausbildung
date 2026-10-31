@@ -311,7 +311,11 @@ Fahrsicherheit: die Einschätzungen aller Posten nebeneinander, plus Bemerkungen
 Weichen sie stark voneinander ab, markiere das in der Verwaltungsansicht – das ist
 für das Gespräch mit dem Kind die interessanteste Information.
 
-### Feedbackbogen (eine A4-Seite pro Kind)
+### Feedbackbogen (in der Regel eine A4-Seite pro Kind)
+
+Hat ein Kind viele Haken und dazu drei Übungspunkte mit ausführlichen Texten,
+wird der Bogen zweiseitig. Das ist zulässig; er bricht dann zwischen zwei
+Abschnitten um.
 
 Adressaten sind ein Kind der Klasse 4 und seine Eltern. Nicht die Schulleitung.
 

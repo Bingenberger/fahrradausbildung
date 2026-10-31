@@ -1,5 +1,6 @@
 {#-
-  Feedbackbogen – eine A4-Seite je Kind.
+  Feedbackbogen – in der Regel eine A4-Seite je Kind; bei vielen Haken und drei
+  ausführlichen Übungstexten wird er zweiseitig.
 
   Diese Datei darf eine Schule austauschen (Logo, Fußzeile, Formulierungen).
   Wie das geht, steht im README unter „Feedbackbogen anpassen".
@@ -52,7 +53,9 @@
     <section class="abschnitt gut">
       <h2>Das klappt schon gut</h2>
       {% if b.feedback.gut %}
-        <ul{% if b.feedback.gut|length > 5 %} class="zweispaltig"{% endif %}>
+        {#- Viele Haken passen nur mehrspaltig auf die Seite. -#}
+        <ul{% if b.feedback.gut|length > 12 %} class="dreispaltig"
+           {%- elif b.feedback.gut|length > 5 %} class="zweispaltig"{% endif %}>
           {% for text in b.feedback.gut %}<li>{{ text }}</li>{% endfor %}
         </ul>
       {% else %}
