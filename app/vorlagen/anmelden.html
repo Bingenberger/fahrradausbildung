@@ -3,7 +3,10 @@
 {% block inhalt %}
 <section class="karte schmal">
   <h1>Anmelden</h1>
-  {% if fehler %}<p class="meldung meldung-fehler" role="alert">{{ fehler }}</p>{% endif %}
+  <p class="hilfe">Verwaltung der Radfahrausbildung. Die Zugangsdaten bekommst du von der Schulleitung.</p>
+  {% if fehler %}
+    <p class="meldung meldung-fehler" role="alert">{{ symbol("warning-circle") }}<span>{{ fehler }}</span></p>
+  {% endif %}
   <form method="post" action="/anmelden" class="formular">
     <input type="hidden" name="csrf" value="{{ anmelde_csrf }}">
     <label>E-Mail-Adresse
@@ -12,7 +15,7 @@
     <label>Passwort
       <input type="password" name="passwort" autocomplete="current-password" required>
     </label>
-    <button type="submit" class="knopf knopf-haupt">Anmelden</button>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("sign-in") }} Anmelden</button>
   </form>
 </section>
 {% endblock %}

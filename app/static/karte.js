@@ -40,7 +40,10 @@
 
   // ------------------------------------------------------------------ Karte
 
-  const karte = L.map("karte", { zoomControl: true });
+  // maxZoom gilt für alle Kartenstile; die Kachelebene bekommt zusätzlich maxNativeZoom.
+  // Sonst sinkt beim Wechsel auf einen gröberen Stil die Obergrenze der Karte unter die
+  // aktuelle Zoomstufe – Leaflet lädt dann gar keine Kacheln mehr und zeigt nur Grau.
+  const karte = L.map("karte", { zoomControl: true, maxZoom: Q.maxZoom });
   L.control.scale({ imperial: false, metric: true }).addTo(karte);
 
   let quelle = "cyclosm";
@@ -50,25 +53,76 @@
   } catch (e) {}
 
   let kachelEbene = null;
-  let kachelFehler = 0;
+
+  // Die Zoomgrenze aus app/kartenquellen.py ist das Versprechen des Dienstes.
+  // Ob er eine Stufe auch für diesen Ort gerendert hat, zeigt erst der Abruf:
+  // CyclOSM liefert über Niederkassel ab Stufe 18 nichts mehr, über Nürnberg
+  // schon. Kommt aus einer Stufe gar keine Kachel, merken wir uns für diese
+  // Quelle die Stufe darunter; Leaflet vergrößert dann deren Bilder, statt die
+  // Karte grau zu lassen. Nur für diesen Seitenaufruf – die Lücken wandern.
+  const gelernt = {};
+  const FEHLER_BIS_RUECKZUG = 3;
+  const RUECKZUG_FRIST = 1200; // ms abwarten: vielleicht kommen doch noch Kacheln
+  const KLEINSTE_GRENZE = 12;
+
+  function grenze() {
+    const g = gelernt[quelle];
+    return g === undefined ? Q.kacheln[quelle].maxNativeZoom : g;
+  }
+
+  function kachelstufe() {
+    return Math.min(Math.round(karte.getZoom()), grenze());
+  }
 
   function quelleAnwenden() {
-    const s = Q.kacheln[quelle];
+    const schluessel = quelle;
+    const s = Q.kacheln[schluessel];
     if (kachelEbene) karte.removeLayer(kachelEbene);
-    kachelFehler = 0;
+    const fehler = {}, geladen = {};
+    let geplant = false;
     kachelEbene = L.tileLayer(s.url, {
       subdomains: s.subs.length ? s.subs : "abc",
-      maxZoom: s.maxZoom,
+      maxZoom: Q.maxZoom,
+      maxNativeZoom: grenze(),
       crossOrigin: true,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende',
     });
-    kachelEbene.on("tileerror", () => {
-      kachelFehler++;
-      if (kachelFehler === 4) status("Dieser Kartenserver liefert gerade keine Bilder. Bitte einen anderen Kartenstil wählen.", 10000);
+    kachelEbene.on("tileload", (e) => { geladen[e.coords.z] = true; });
+    kachelEbene.on("tileerror", (e) => {
+      const z = e.coords ? e.coords.z : -1;
+      if (geplant || z !== kachelstufe()) return;
+      fehler[z] = (fehler[z] || 0) + 1;
+      if (fehler[z] < FEHLER_BIS_RUECKZUG) return;
+      geplant = true;
+      setTimeout(() => { geplant = false; zurueckziehen(schluessel, z, geladen); }, RUECKZUG_FRIST);
     });
     kachelEbene.addTo(karte);
     $("quelle-nennung").textContent = s.attr;
+    zoomHinweis();
   }
+
+  function zurueckziehen(schluessel, z, geladen) {
+    if (schluessel !== quelle || z > grenze()) return; // Kartenstil inzwischen gewechselt
+    if (geladen[z]) return; // es fehlten nur einzelne Kacheln
+    if (z - 1 < KLEINSTE_GRENZE) {
+      status("Dieser Kartenserver liefert gerade keine Bilder. Bitte einen anderen Kartenstil wählen.", 10000);
+      return;
+    }
+    gelernt[schluessel] = z - 1;
+    status(Q.kacheln[schluessel].label + " hat hier ab Zoomstufe " + z + " keine eigenen Bilder. "
+      + "Die Karte wird vergrößert dargestellt – mit einem anderen Kartenstil wird sie schärfer.", 12000);
+    quelleAnwenden();
+  }
+
+  // Oberhalb der Kachelgrenze vergrößert Leaflet die letzten Bilder: sichtbar, aber unscharf.
+  function zoomHinweis() {
+    const g = grenze();
+    const el = $("zoom-hinweis");
+    el.hidden = !(karte.getZoom() > g);
+    el.textContent = "Ab Zoomstufe " + (g + 1) + " hat dieser Kartenstil hier keine eigenen Bilder mehr: "
+      + "Die Karte wird vergrößert und dadurch unscharf. Ein anderer Kartenstil kann hier schärfer sein.";
+  }
+  karte.on("zoomend", zoomHinweis);
 
   const auswahl = $("quelle");
   for (const [schluessel, s] of Object.entries(Q.kacheln)) {
@@ -436,19 +490,28 @@
     if (!f) return;
     const leser = new FileReader();
     leser.onload = () => {
-      let pts;
+      let pts, roh = null;
       try {
-        pts = /\.(geojson|json)$/i.test(f.name) ? ausGeoJSON(JSON.parse(String(leser.result))) : ausXML(String(leser.result));
+        if (/\.(geojson|json)$/i.test(f.name)) { roh = JSON.parse(String(leser.result)); pts = ausGeoJSON(roh); }
+        else { pts = ausXML(String(leser.result)); }
       } catch (err) {
         status("Datei konnte nicht gelesen werden: " + err.message, 7000);
         return;
       }
-      if (pts.length < 2) { status("In der Datei wurde keine Linie gefunden.", 6000); return; }
+      if (pts.length < 2) {
+        // Ein Strecken-Export ist ebenfalls JSON und wird hier naheliegenderweise
+        // abgelegt – er gehört aber auf die Streckenliste, wo er auch Posten und
+        // Items mitbringt. Ohne den Hinweis sucht man den Fehler in der Datei.
+        status(roh && roh.format === "fahrradpruefung-strecke"
+          ? "Das ist ein Strecken-Export. Den liest du unter „Strecken“ mit „Strecke importieren“ ein – dabei kommen auch Posten und Items mit."
+          : "In der Datei wurde keine Linie gefunden.", 8000);
+        return;
+      }
       zustand.streckenmodus = "import";
       zustand.spur = pts; zustand.linie = pts; zustand.wegpunkte = [];
       geaendert();
       zeichnen();
-      karte.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
+      karte.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: Q.kacheln[quelle].maxNativeZoom });
       status(pts.length + " Punkte übernommen (" + laengeText(laenge(pts)) + ").", 5000);
     };
     leser.readAsText(f);
@@ -526,7 +589,7 @@
     const mitPosten = $("opt-posten").checked;
     const groesse = karte.getSize();
     const W = Math.round(groesse.x * f), H = Math.round(groesse.y * f);
-    const z = Math.min(Q.kacheln[quelle].maxZoom, karte.getZoom() + (f === 2 ? 1 : 0));
+    const z = Math.min(Q.kacheln[quelle].maxNativeZoom, karte.getZoom() + (f === 2 ? 1 : 0));
     const nw = karte.project(karte.getBounds().getNorthWest(), z);
     const se = karte.project(karte.getBounds().getSouthEast(), z);
     const kx = W / (se.x - nw.x), ky = H / (se.y - nw.y);
@@ -645,9 +708,9 @@
 
   const alle = [...zustand.linie, ...zustand.posten.filter((p) => p.ort).map((p) => p.ort)];
   const vergleich = daten.andere.flatMap((s) => s.linie);
-  if (alle.length > 1) karte.fitBounds(L.latLngBounds(alle), { padding: [40, 40] });
+  if (alle.length > 1) karte.fitBounds(L.latLngBounds(alle), { padding: [40, 40], maxZoom: Q.kacheln[quelle].maxNativeZoom });
   else if (alle.length === 1) karte.setView(alle[0], 17);
-  else if (vergleich.length > 1) karte.fitBounds(L.latLngBounds(vergleich), { padding: [40, 40] });
+  else if (vergleich.length > 1) karte.fitBounds(L.latLngBounds(vergleich), { padding: [40, 40], maxZoom: Q.kacheln[quelle].maxNativeZoom });
   else {
     karte.setView(DEUTSCHLAND[0], DEUTSCHLAND[1]);
     status("Suche links den Ort der Schule, dann Posten setzen und die Strecke klicken.", 10000);

@@ -1,12 +1,17 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld, mit_rueckfrage, verschieben with context %}
+{% from "_makros.html" import brotkrume, csrf_feld, leerzustand, mit_rueckfrage, verschieben with context %}
 {% block titel %}{{ ablauf.name }}{% endblock %}
 {% block inhalt %}
-<p class="brotkrumen"><a href="/verwaltung/ablaeufe">Abläufe</a> ›</p>
-<h1>{{ ablauf.name }}</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    {{ brotkrume("/verwaltung/ablaeufe", "Abläufe") }}
+    <h1>{{ ablauf.name }}</h1>
+    <p class="seitenkopf-bei"><span>{{ symbol("list-checks") }} {{ ablauf.schritte|length }} Schritte</span></p>
+  </div>
+</div>
 
 <section class="karte">
-  <h2>Handlungsschritte</h2>
+  <h2>{{ symbol("list-checks") }} Handlungsschritte</h2>
   <p class="hilfe">Wie bei den Items eines Postens: Die <strong>Kurzbezeichnung</strong> steht auf dem Knopf am iPad,
     der <strong>Beobachtungstext</strong> sagt den Eltern, worauf sie achten sollen,
     der <strong>Übungstext</strong> erscheint im Feedbackbogen.</p>
@@ -17,22 +22,29 @@
         <h3>{{ loop.index }}. {{ s.kurzbezeichnung }}</h3>
         {{ verschieben("/verwaltung/ablaufschritte/%d/verschieben"|format(s.id), loop.first, loop.last) }}
       </div>
-      <form method="post" action="/verwaltung/ablaufschritte/{{ s.id }}/bearbeiten" class="formular">
-        {{ csrf_feld() }}
-        <label>Kurzbezeichnung <span class="hilfe">auf dem Knopf, höchstens 40 Zeichen</span>
-          <input type="text" name="kurzbezeichnung" value="{{ s.kurzbezeichnung }}" maxlength="40" required></label>
-        <label>Beobachtungstext <span class="hilfe">für die Eltern am Posten</span>
-          <textarea name="beobachtungstext" rows="2">{{ s.beobachtungstext }}</textarea></label>
-        <label>Übungstext <span class="hilfe">für den Feedbackbogen, an das Kind gerichtet</span>
-          <textarea name="uebungstext" rows="2">{{ s.uebungstext }}</textarea></label>
-        <div class="aktionsleiste">
-          <button type="submit" class="knopf">Speichern</button>
-          {{ mit_rueckfrage("/verwaltung/ablaufschritte/%d/loeschen"|format(s.id), "Löschen", "Dieser Schritt wird aus dem Ablauf gelöscht.") }}
-        </div>
-      </form>
+      <dl class="item-vorschau">
+        <dt>Beobachtung</dt><dd>{{ s.beobachtungstext or "– noch kein Text –" }}</dd>
+        <dt>Übung</dt><dd>{{ s.uebungstext or "– noch kein Text –" }}</dd>
+      </dl>
+      <details class="ausklapp">
+        <summary>{{ symbol("caret-right") }} Texte bearbeiten</summary>
+        <form method="post" action="/verwaltung/ablaufschritte/{{ s.id }}/bearbeiten" class="formular">
+          {{ csrf_feld() }}
+          <label>Kurzbezeichnung <span class="hilfe">auf dem Knopf, höchstens 40 Zeichen</span>
+            <input type="text" name="kurzbezeichnung" value="{{ s.kurzbezeichnung }}" maxlength="40" required></label>
+          <label>Beobachtungstext <span class="hilfe">für die Eltern am Posten</span>
+            <textarea name="beobachtungstext" rows="2">{{ s.beobachtungstext }}</textarea></label>
+          <label>Übungstext <span class="hilfe">für den Feedbackbogen, an das Kind gerichtet</span>
+            <textarea name="uebungstext" rows="2">{{ s.uebungstext }}</textarea></label>
+          <div class="aktionsleiste">
+            <button type="submit" class="knopf knopf-haupt">{{ symbol("floppy-disk") }} Speichern</button>
+            {{ mit_rueckfrage("/verwaltung/ablaufschritte/%d/loeschen"|format(s.id), "Löschen", "Dieser Schritt wird aus dem Ablauf gelöscht.") }}
+          </div>
+        </form>
+      </details>
     </article>
   {% else %}
-    <p>Dieser Ablauf hat noch keine Schritte.</p>
+    {{ leerzustand("list-checks", "Dieser Ablauf hat noch keine Schritte. Lege unten den ersten an.") }}
   {% endfor %}
 
   <h3>Schritt hinzufügen</h3>
@@ -44,17 +56,17 @@
       <textarea name="beobachtungstext" rows="2"></textarea></label>
     <label>Übungstext <span class="hilfe">für den Feedbackbogen</span>
       <textarea name="uebungstext" rows="2"></textarea></label>
-    <button type="submit" class="knopf">Schritt hinzufügen</button>
+    <button type="submit" class="knopf">{{ symbol("plus") }} Schritt hinzufügen</button>
   </form>
 </section>
 
 <section class="karte">
-  <h2>Ablauf bearbeiten</h2>
+  <h2>{{ symbol("pencil-simple") }} Ablauf bearbeiten</h2>
   <form method="post" action="/verwaltung/ablaeufe/{{ ablauf.id }}/bearbeiten" class="formular">
     {{ csrf_feld() }}
     <label>Name <input type="text" name="name" value="{{ ablauf.name }}" maxlength="200" required></label>
     <label>Beschreibung <textarea name="beschreibung" rows="2">{{ ablauf.beschreibung }}</textarea></label>
-    <button type="submit" class="knopf">Speichern</button>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("floppy-disk") }} Speichern</button>
   </form>
   <div class="aktionsleiste">
     {{ mit_rueckfrage("/verwaltung/ablaeufe/%d/loeschen"|format(ablauf.id), "Ablauf löschen",

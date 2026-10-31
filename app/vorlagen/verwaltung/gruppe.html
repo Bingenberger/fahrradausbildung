@@ -1,22 +1,37 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld, knopf, mit_rueckfrage with context %}
+{% from "_makros.html" import brotkrume, csrf_feld, knopf, leerzustand, mit_rueckfrage, pdf_knopf, symbolknopf with context %}
 {% block titel %}{{ gruppe.name }}{% endblock %}
 {% block inhalt %}
-<p class="brotkrumen"><a href="/verwaltung/gruppen">Gruppen</a> ›</p>
-<h1>{{ gruppe.name }} <span class="hilfe">{{ gruppe.schuljahr }}</span>
-  {% if gruppe.archiviert %}<span class="marke-archiv">archiviert</span>{% endif %}</h1>
+{% set aktive = kinder|selectattr("aktiv")|list|length %}
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    {{ brotkrume("/verwaltung/gruppen", "Gruppen") }}
+    <h1>{{ gruppe.name }} {% if gruppe.archiviert %}<span class="marke-archiv">{{ symbol("archive") }} archiviert</span>{% endif %}</h1>
+    <p class="seitenkopf-bei">
+      <span>{{ symbol("calendar-dots") }} Schuljahr {{ gruppe.schuljahr }}</span>
+      <span>{{ symbol("identification-badge") }} {{ aktive }} aktive Startnummern</span>
+    </p>
+  </div>
+  {% if kinder %}
+    <div class="aktionsleiste">
+      {{ pdf_knopf("/verwaltung/gruppen/%d/namensliste.pdf"|format(gruppe.id), "Namensliste drucken", "knopf knopf-haupt") }}
+    </div>
+  {% endif %}
+</div>
 
 {% if startnummern_fest %}
-  <p class="hinweis">Diese Gruppe hat bereits einen Lauf. Die Startnummern sind deshalb fest und lassen
-    sich nur deaktivieren, nicht löschen.</p>
+  <p class="hinweis">{{ symbol("info") }}
+    <span>Diese Gruppe hat bereits einen Lauf. Die Startnummern sind deshalb fest und lassen
+      sich nur deaktivieren, nicht löschen.</span></p>
 {% endif %}
 
 <section class="karte" id="kinder">
-  <h2>Startnummern ({{ kinder|selectattr("aktiv")|list|length }} aktiv)</h2>
+  <h2>{{ symbol("identification-badge") }} Startnummern</h2>
   <p class="hilfe">Die Anwendung speichert keine Namen. Drucke die Namensliste aus und trage die Namen von Hand ein.
     Die Liste bleibt bei der Klassenleitung – und jedes Kind bekommt bei jedem Lauf dieselbe Nummer.</p>
   {% if kinder %}
-    <p><a class="knopf knopf-haupt" href="/verwaltung/gruppen/{{ gruppe.id }}/namensliste.pdf">Namensliste drucken (PDF)</a></p>
+    <p class="hilfe">{{ symbol("x") }} deaktivieren – die Nummer bleibt vergeben, das Kind fährt nicht mit.
+      {% if not startnummern_fest %}{{ symbol("trash") }} löschen – die Nummer verschwindet ganz.{% endif %}</p>
     <ul class="nummern-liste">
       {% for k in kinder %}
         <li class="nummer-eintrag {% if not k.aktiv %}archiviert{% endif %}" id="kind-{{ k.id }}">
@@ -24,45 +39,47 @@
           {% if not k.aktiv %}<span class="leise">inaktiv</span>{% endif %}
           <div class="aktionsleiste">
             {% if k.aktiv %}
-              {{ knopf("/verwaltung/kinder/%d/deaktivieren"|format(k.id), "Deaktivieren", "knopf knopf-klein") }}
+              {{ symbolknopf("/verwaltung/kinder/%d/deaktivieren"|format(k.id), sym="x", titel="Nr. %d deaktivieren"|format(k.startnummer)) }}
             {% else %}
-              {{ knopf("/verwaltung/kinder/%d/aktivieren"|format(k.id), "Aktivieren", "knopf knopf-klein") }}
+              {{ symbolknopf("/verwaltung/kinder/%d/aktivieren"|format(k.id), sym="check", titel="Nr. %d aktivieren"|format(k.startnummer)) }}
             {% endif %}
             {% if not startnummern_fest %}
-              {{ mit_rueckfrage("/verwaltung/kinder/%d/loeschen"|format(k.id), "Löschen", "Diese Startnummer wird aus der Gruppe gelöscht.") }}
+              {{ mit_rueckfrage("/verwaltung/kinder/%d/loeschen"|format(k.id), "Nr. %d löschen"|format(k.startnummer),
+                 "Diese Startnummer wird aus der Gruppe gelöscht.", nur_symbol=true) }}
             {% endif %}
           </div>
         </li>
       {% endfor %}
     </ul>
   {% else %}
-    <p>Diese Gruppe hat noch keine Startnummern.</p>
+    {{ leerzustand("identification-badge", "Diese Gruppe hat noch keine Startnummern. Lege unten den Bereich an, der zur Klassenstärke passt.") }}
   {% endif %}
 
   <h3>Startnummern hinzufügen</h3>
   <form method="post" action="/verwaltung/gruppen/{{ gruppe.id }}/kinder" class="formular formular-reihe">
     {{ csrf_feld() }}
     <label>von <input type="number" name="von" min="1" max="999" required></label>
-    <label>bis <input type="number" name="bis" min="1" max="999" placeholder="leer = nur eine Nummer"></label>
-    <button type="submit" class="knopf">Hinzufügen</button>
+    <label>bis <span class="hilfe">leer = nur eine Nummer</span>
+      <input type="number" name="bis" min="1" max="999"></label>
+    <button type="submit" class="knopf">{{ symbol("plus") }} Hinzufügen</button>
   </form>
   <p class="hilfe">Vorhandene Nummern werden übersprungen. Ein Kind kommt neu dazu: einfach die nächste freie Nummer anlegen
     und auf der Papierliste ergänzen. Ein Kind fehlt dauerhaft: Nummer deaktivieren.</p>
 </section>
 
 <section class="karte">
-  <h2>Gruppe bearbeiten</h2>
+  <h2>{{ symbol("pencil-simple") }} Gruppe bearbeiten</h2>
   <form method="post" action="/verwaltung/gruppen/{{ gruppe.id }}/bearbeiten" class="formular formular-reihe">
     {{ csrf_feld() }}
     <label>Name <input type="text" name="name" value="{{ gruppe.name }}" maxlength="200" required></label>
     <label>Schuljahr <input type="text" name="schuljahr" value="{{ gruppe.schuljahr }}" maxlength="20" required></label>
-    <button type="submit" class="knopf">Speichern</button>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("floppy-disk") }} Speichern</button>
   </form>
   <div class="aktionsleiste">
     {% if gruppe.archiviert %}
-      {{ knopf("/verwaltung/gruppen/%d/reaktivieren"|format(gruppe.id), "Wieder aktivieren") }}
+      {{ knopf("/verwaltung/gruppen/%d/reaktivieren"|format(gruppe.id), "Wieder aktivieren", sym="arrow-counter-clockwise") }}
     {% else %}
-      {{ knopf("/verwaltung/gruppen/%d/archivieren"|format(gruppe.id), "Archivieren") }}
+      {{ knopf("/verwaltung/gruppen/%d/archivieren"|format(gruppe.id), "Archivieren", sym="archive") }}
     {% endif %}
     {% if not startnummern_fest %}
       {{ mit_rueckfrage("/verwaltung/gruppen/%d/loeschen"|format(gruppe.id), "Löschen",

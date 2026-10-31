@@ -12,10 +12,12 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
+from fastapi.responses import Response
 from sqlalchemy import func, select
 
 from app.mandant import SchulRepository
-from app.modelle import Ablauf, Item, Lauf, Posten, Strecke
+from app.modelle import Ablauf, Item, Lauf, Posten, Schule, Strecke
+from app.pdf import ordnername, streckenplan_pdf
 from app.web.abhaengigkeiten import SCHULADMIN_ROUTER, SchulRepo, meldung
 from app.web.vorlagen import seite, weiter_zu
 
@@ -83,6 +85,19 @@ def strecke_ansehen(request: Request, repo: SchulRepo, strecke_id: int):
         "verwaltung/strecke.html",
         strecke=strecke,
         anzahl_laeufe=_anzahl_laeufe(repo, strecke.id),
+    )
+
+
+@router.get("/strecken/{strecke_id}/streckenplan.pdf")
+def streckenplan(repo: SchulRepo, strecke_id: int):
+    """Streckenplan zum Ausdrucken: Übersichtskarte und je Posten eine Nahaufnahme."""
+    strecke = repo.holen(Strecke, strecke_id)
+    schule = repo.holen(Schule, repo.schule_id)
+    name = ordnername(strecke.name) or str(strecke.id)
+    return Response(
+        streckenplan_pdf(strecke, schule.name),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="streckenplan-{name}.pdf"'},
     )
 
 
@@ -249,7 +264,7 @@ def item_anlegen(
     posten = repo.holen(Posten, posten_id)
     if not _struktur_aenderbar(request, repo, posten.strecke):
         return weiter_zu(f"/verwaltung/posten/{posten.id}")
-    fehler = _item_pruefen(kurzbezeichnung)
+    fehler = item_pruefen(kurzbezeichnung)
     if fehler:
         meldung(request, fehler, "fehler")
         return weiter_zu(f"/verwaltung/posten/{posten.id}")
@@ -266,7 +281,12 @@ def item_anlegen(
     return weiter_zu(f"/verwaltung/posten/{posten.id}")
 
 
-def _item_pruefen(kurzbezeichnung: str) -> str | None:
+def item_pruefen(kurzbezeichnung: str) -> str | None:
+    """Kurzbezeichnung prüfen; Meldung oder None.
+
+    Auch der Streckenimport (``app/verwaltung/export.py``) prüft damit – eine
+    Datei darf keine Bezeichnung einschmuggeln, die nicht auf den Knopf passt.
+    """
     k = kurzbezeichnung.strip()
     if not k:
         return "Bitte eine Kurzbezeichnung angeben – sie steht auf dem Knopf am Posten."
@@ -285,7 +305,7 @@ def item_bearbeiten(
     uebungstext: Text = "",
 ):
     item = repo.holen(Item, item_id)
-    fehler = _item_pruefen(kurzbezeichnung)
+    fehler = item_pruefen(kurzbezeichnung)
     if fehler:
         meldung(request, fehler, "fehler")
     else:

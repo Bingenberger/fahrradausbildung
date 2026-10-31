@@ -1,26 +1,40 @@
-{# Formular-Bausteine. Jedes POST-Formular trägt das CSRF-Token. #}
+{# Bausteine der Oberfläche. Jedes POST-Formular trägt das CSRF-Token.
+   Symbole kommen aus app/web/symbole.py (Phosphor, lokal, inline). #}
 
 {% macro csrf_feld() -%}
   <input type="hidden" name="csrf" value="{{ csrf }}">
 {%- endmacro %}
 
-{% macro knopf(action, text, klasse="knopf", felder={}) -%}
+{# Knopf, der eine Aktion auslöst (POST). ``sym``: Name eines Phosphor-Symbols. #}
+{% macro knopf(action, text, klasse="knopf", felder={}, sym="") -%}
   <form method="post" action="{{ action }}" class="inline">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% for k, v in felder.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-    <button type="submit" class="{{ klasse }}">{{ text }}</button>
+    <button type="submit" class="{{ klasse }}">{% if sym %}{{ symbol(sym) }}{% endif %}{{ text }}</button>
   </form>
 {%- endmacro %}
 
-{# Gefährliche Aktion mit Rückfrage – ohne JavaScript #}
-{% macro mit_rueckfrage(action, text, frage) -%}
+{# Knopf, der nur ein Symbol zeigt: für Reihen, in denen sich dieselbe Aktion
+   oft wiederholt. Die Beschriftung bleibt für Screenreader und Mauszeiger da. #}
+{% macro symbolknopf(action, sym, titel, klasse="knopf knopf-klein knopf-symbol") -%}
+  <form method="post" action="{{ action }}" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="{{ klasse }}" aria-label="{{ titel }}" title="{{ titel }}">{{ symbol(sym) }}</button>
+  </form>
+{%- endmacro %}
+
+{# Gefährliche Aktion mit Rückfrage – ohne JavaScript.
+   ``nur_symbol``: wie symbolknopf, nur das Symbol im Auslöser. #}
+{% macro mit_rueckfrage(action, text, frage, sym="trash", nur_symbol=false) -%}
   <details class="rueckfrage">
-    <summary class="knopf knopf-gefahr-leise">{{ text }}</summary>
+    <summary class="knopf knopf-gefahr-leise{{ " knopf-klein knopf-symbol" if nur_symbol }}"
+      {%- if nur_symbol %} aria-label="{{ text }}" title="{{ text }}"{% endif %}>
+      {%- if sym %}{{ symbol(sym) }}{% endif %}{{ "" if nur_symbol else text }}</summary>
     <div class="rueckfrage-inhalt">
       <p>{{ frage }}</p>
       <form method="post" action="{{ action }}">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit" class="knopf knopf-gefahr">Ja, {{ text|lower }}</button>
+        <button type="submit" class="knopf knopf-gefahr">{{ symbol("check") }}Ja, {{ text|lower }}</button>
       </form>
     </div>
   </details>
@@ -30,11 +44,35 @@
   <span class="verschieben">
     <form method="post" action="{{ action }}" class="inline">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="richtung" value="hoch">
-      <button type="submit" class="knopf knopf-klein" {% if erster %}disabled{% endif %} aria-label="nach oben">↑</button>
+      <button type="submit" class="knopf knopf-klein" {% if erster %}disabled{% endif %} aria-label="nach oben">{{ symbol("arrow-up") }}</button>
     </form>
     <form method="post" action="{{ action }}" class="inline">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="richtung" value="runter">
-      <button type="submit" class="knopf knopf-klein" {% if letzter %}disabled{% endif %} aria-label="nach unten">↓</button>
+      <button type="submit" class="knopf knopf-klein" {% if letzter %}disabled{% endif %} aria-label="nach unten">{{ symbol("arrow-down") }}</button>
     </form>
   </span>
+{%- endmacro %}
+
+{# Verweis auf ein PDF – immer in einem neuen Tab.
+
+   Die Blätter werden angesehen und gedruckt; die Seite dahinter soll stehen
+   bleiben, sonst muss man sich nach jedem Druck zurückklicken. Weil das Auge
+   das am Verweis nicht sieht, sagt es ein unsichtbarer Zusatz an. #}
+{% macro pdf_knopf(ziel, text, klasse="knopf", sym="printer") -%}
+  <a{% if klasse %} class="{{ klasse }}"{% endif %} href="{{ ziel }}" target="_blank" rel="noopener"
+    >{%- if sym %}{{ symbol(sym) }}{% endif %}{{ text }}<span class="unsichtbar"> (öffnet in neuem Tab)</span></a>
+{%- endmacro %}
+
+{# Weg zurück: steht über der Überschrift jeder Unterseite. #}
+{% macro brotkrume(ziel, text) -%}
+  <p class="brotkrumen"><a href="{{ ziel }}">{{ text }}</a> {{ symbol("caret-right") }}</p>
+{%- endmacro %}
+
+{# „Hier ist noch nichts": Symbol, ein Satz, und wo es weitergeht. #}
+{% macro leerzustand(sym, text) -%}
+  <div class="leerzustand">
+    {{ symbol(sym) }}
+    <p>{{ text }}</p>
+    {% if caller is defined %}{{ caller() }}{% endif %}
+  </div>
 {%- endmacro %}

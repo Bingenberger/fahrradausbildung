@@ -16,7 +16,7 @@ from fastapi import APIRouter, Form, Request
 from app.beispielablaeufe import BEISPIELE
 from app.mandant import SchulRepository
 from app.modelle import Ablauf, AblaufSchritt, Item, Posten
-from app.verwaltung.strecken import _item_pruefen, _neu_nummerieren, _struktur_aenderbar, _verschieben
+from app.verwaltung.strecken import _neu_nummerieren, _struktur_aenderbar, _verschieben, item_pruefen
 from app.web.abhaengigkeiten import SCHULADMIN_ROUTER, SchulRepo, meldung
 from app.web.vorlagen import seite, weiter_zu
 
@@ -117,7 +117,7 @@ def schritt_anlegen(
     uebungstext: Text = "",
 ):
     ablauf = repo.holen(Ablauf, ablauf_id)
-    fehler = _item_pruefen(kurzbezeichnung)
+    fehler = item_pruefen(kurzbezeichnung)
     if fehler:
         meldung(request, fehler, "fehler")
     else:
@@ -144,7 +144,7 @@ def schritt_bearbeiten(
     uebungstext: Text = "",
 ):
     schritt = repo.holen(AblaufSchritt, schritt_id)
-    fehler = _item_pruefen(kurzbezeichnung)
+    fehler = item_pruefen(kurzbezeichnung)
     if fehler:
         meldung(request, fehler, "fehler")
     else:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import re
 from collections.abc import Sequence
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,9 +18,9 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import CSS, HTML
 
 from app.config import einstellungen
-from app.kartenbild import kartenbild
-from app.formate import datum_kurz, datum_lang
-from app.modelle import Gruppe, Kind, Lauf, Schule
+from app.kartenbild import ZOOM_POSTEN, ausschnitt, kartenbild, laenge_meter
+from app.formate import datum_kurz, datum_lang, laenge_text
+from app.modelle import Gruppe, Kind, Lauf, Schule, Strecke
 from app.token import token_url
 
 PDF_VORLAGEN = Path(__file__).resolve().parent / "vorlagen" / "pdf"
@@ -32,6 +33,7 @@ def _umgebung(suchpfade: tuple[Path, ...]) -> Environment:
     env = Environment(loader=FileSystemLoader(suchpfade), autoescape=select_autoescape(["html"]))
     env.filters["datum"] = datum_kurz
     env.filters["datum_lang"] = datum_lang
+    env.filters["laenge"] = laenge_text
     return env
 
 
@@ -100,17 +102,25 @@ def namensliste_pdf(schule: Schule, gruppe: Gruppe, kinder: Sequence[Kind]) -> b
     return _rendern("namensliste.html", "namensliste.css", schule=schule, gruppe=gruppe, kinder=kinder)
 
 
+def _bild_uri(png: bytes | None) -> str | None:
+    return "data:image/png;base64," + base64.b64encode(png).decode() if png else None
+
+
+def _verortet(strecke: Strecke) -> list[tuple[int, float, float]]:
+    """(Nummer, lat, lng) aller Posten mit Standort – in Fahrreihenfolge nummeriert."""
+    return [(i, p.lat, p.lng) for i, p in enumerate(strecke.posten, 1) if p.lat is not None]
+
+
 def _standort_karte(lauf: Lauf, nummer: int) -> str | None:
     """Kartenausschnitt rund um Posten ``nummer`` als data:-URI – oder None."""
-    alle = lauf.strecke.posten
-    posten = alle[nummer - 1]
+    posten = lauf.strecke.posten[nummer - 1]
     if posten.lat is None or posten.lng is None:
         return None
-    verortet = [(i, p.lat, p.lng) for i, p in enumerate(alle, 1) if p.lat is not None and p.lng is not None]
     linie = (lauf.strecke.verlauf or {}).get("linie", [])
     # 1200 × 282 Pixel entspricht dem Rahmen auf dem Blatt (170 × 40 mm).
-    png = kartenbild((posten.lat, posten.lng), linie, verortet, hervorgehoben=nummer, breite=1200, hoehe=282)
-    return "data:image/png;base64," + base64.b64encode(png).decode() if png else None
+    png = kartenbild((posten.lat, posten.lng), linie, _verortet(lauf.strecke),
+                     hervorgehoben=nummer, breite=1200, hoehe=282)
+    return _bild_uri(png)
 
 
 def postenblaetter_pdf(lauf: Lauf, schule_name: str) -> bytes:
@@ -134,4 +144,57 @@ def postenblaetter_pdf(lauf: Lauf, schule_name: str) -> bytes:
         lauf=lauf,
         schule_name=schule_name,
         blaetter=blaetter,
+    )
+
+
+# --------------------------------------------------------------------------- Streckenplan
+
+# Bildgrößen in Pixel; die Seitenverhältnisse entsprechen den Rahmen im
+# Stylesheet (Übersicht 170 × 141,7 mm, Posten 170 × 121,8 mm) – gut 175 dpi.
+UEBERSICHT_PX = (1200, 1000)
+POSTEN_PX = (1200, 860)
+
+
+def streckenplan_pdf(strecke: Strecke, schule_name: str) -> bytes:
+    """Streckenplan: Übersichtskarte der Gesamtstrecke, dann eine Seite je Posten.
+
+    Die Posten-Seiten zeigen denselben Ausschnitt sehr hoch gezoomt
+    (``ZOOM_POSTEN``), damit auf dem Papier die Einmündung selbst erkennbar ist.
+    Posten ohne Standort bekommen ihre Seite ohne Karte; fällt der Kachelserver
+    aus, entsteht der Plan ohne Bilder statt gar nicht.
+    """
+    linie = (strecke.verlauf or {}).get("linie", [])
+    verortet = _verortet(strecke)
+
+    punkte = [*linie, *[(lat, lng) for _, lat, lng in verortet]]
+    uebersicht = None
+    if punkte:
+        mitte, zoom = ausschnitt(punkte, *UEBERSICHT_PX)
+        uebersicht = _bild_uri(kartenbild(mitte, linie, verortet, breite=UEBERSICHT_PX[0],
+                                          hoehe=UEBERSICHT_PX[1], zoom=zoom))
+
+    blaetter = [
+        {
+            "nummer": i,
+            "posten": p,
+            "karte": _bild_uri(
+                kartenbild((p.lat, p.lng), linie, verortet, hervorgehoben=i,
+                           breite=POSTEN_PX[0], hoehe=POSTEN_PX[1], zoom=ZOOM_POSTEN)
+            )
+            if p.lat is not None
+            else None,
+        }
+        for i, p in enumerate(strecke.posten, 1)
+    ]
+    return _rendern(
+        "streckenplan.html",
+        "streckenplan.css",
+        strecke=strecke,
+        schule_name=schule_name,
+        stand=date.today(),
+        uebersicht=uebersicht,
+        laenge_m=laenge_meter(linie),
+        verortet=len(verortet),
+        blaetter=blaetter,
+        zoom_posten=ZOOM_POSTEN,
     )

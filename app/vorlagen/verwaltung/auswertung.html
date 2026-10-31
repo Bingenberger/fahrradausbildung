@@ -1,21 +1,37 @@
 {% extends "basis.html" %}
+{% from "_makros.html" import pdf_knopf with context %}
 {% block titel %}Auswertung {{ lauf.datum|datum }}{% endblock %}
 {% block inhalt %}
-<p class="brotkrumen"><a href="/verwaltung/laeufe">Läufe</a> › <a href="/verwaltung/laeufe/{{ lauf.id }}">{{ lauf.datum|datum_lang }}</a> ›</p>
-<h1>Auswertung <span class="status status-{{ lauf.status }}">{{ status_text[lauf.status] }}</span></h1>
-<p>Gruppe {{ lauf.gruppe.name }} · Strecke {{ lauf.strecke.name }}</p>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <p class="brotkrumen">
+      <a href="/verwaltung/laeufe">Läufe</a> {{ symbol("caret-right") }}
+      <a href="/verwaltung/laeufe/{{ lauf.id }}">{{ lauf.datum|datum_lang }}</a> {{ symbol("caret-right") }}
+    </p>
+    <h1>Auswertung <span class="status status-{{ lauf.status }}">{{ status_text[lauf.status] }}</span></h1>
+    <p class="seitenkopf-bei">
+      <span>{{ symbol("users-three") }} {{ lauf.gruppe.name }}</span>
+      <span>{{ symbol("path") }} {{ lauf.strecke.name }}</span>
+    </p>
+  </div>
+  <div class="aktionsleiste">
+    {{ pdf_knopf("/verwaltung/laeufe/%d/feedbackboegen.pdf"|format(lauf.id), "Alle Feedbackbögen", "knopf knopf-haupt") }}
+  </div>
+</div>
 <p class="hilfe">Je Posten: wie oft ein Punkt vergessen wurde, bezogen auf die Durchgänge des Kindes an diesem Posten.
   Diese Zahlen sind nur für dich – der Feedbackbogen formuliert sie ohne Zahlen.</p>
 
 {% if lauf.daten_geloescht_am %}
-<p class="hinweis">Die Erfassungen dieses Laufs wurden am {{ lauf.daten_geloescht_am|zeit }} nach Ablauf der Aufbewahrungsfrist gelöscht.</p>
+<p class="hinweis">{{ symbol("info") }}
+  <span>Die Erfassungen dieses Laufs wurden am {{ lauf.daten_geloescht_am|zeit }} nach Ablauf der Aufbewahrungsfrist gelöscht.</span></p>
 {% endif %}
 <section class="karte">
-  <h2>Feedbackbögen</h2>
+  <h2>{{ symbol("file-pdf") }} Feedbackbögen</h2>
   {% if lauf.status in ("vorbereitet", "laufend") %}
-    <p class="hinweis">Der Lauf ist noch nicht abgeschlossen. Drucke die Bögen erst, wenn alle Posten übertragen haben.</p>
+    <p class="hinweis">{{ symbol("warning") }}
+      <span>Der Lauf ist noch nicht abgeschlossen. Drucke die Bögen erst, wenn alle Posten übertragen haben.</span></p>
   {% endif %}
-  <p><a class="knopf knopf-haupt" href="/verwaltung/laeufe/{{ lauf.id }}/feedbackboegen.pdf">Alle Feedbackbögen (PDF)</a></p>
+  <p>{{ pdf_knopf("/verwaltung/laeufe/%d/feedbackboegen.pdf"|format(lauf.id), "Alle Feedbackbögen (PDF)") }}</p>
   <p class="hilfe">Eine Seite je Kind, zum Ausdrucken und Mitgeben. Einzelne Bögen gibt es in der Tabelle unter „Bogen".
     Auf dem Bogen stehen keine Zahlen – nur, was schon gut klappt, höchstens drei Übungspunkte und ein Satz zur Fahrsicherheit.</p>
   {% if ohne_bogen %}
@@ -26,9 +42,10 @@
 
 {% if abweichend %}
 <section class="hinweis">
-  <strong>Stark abweichende Fahrsicherheits-Einschätzungen</strong> (ein Posten „sicher", ein anderer „unsicher"):
+  {{ symbol("warning") }}
+  <span><strong>Stark abweichende Fahrsicherheits-Einschätzungen</strong> (ein Posten „sicher", ein anderer „unsicher"):
   {% for z in abweichend %}<a href="#nr-{{ z.kind.startnummer }}">Nr. {{ z.kind.startnummer }}</a>{{ ", " if not loop.last }}{% endfor %}.
-  Das lohnt ein Gespräch mit dem Kind.
+  Das lohnt ein Gespräch mit dem Kind.</span>
 </section>
 {% endif %}
 
@@ -82,7 +99,7 @@
             </ul>
           {% endif %}
         </td>
-        <td>{% if z.kind not in ohne_bogen %}<a href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ z.kind.id }}/feedbackbogen.pdf">Bogen</a>{% endif %}</td>
+        <td>{% if z.kind not in ohne_bogen %}{{ pdf_knopf("/verwaltung/laeufe/%d/kinder/%d/feedbackbogen.pdf"|format(lauf.id, z.kind.id), "Bogen", "", "") }}{% endif %}</td>
       </tr>
     {% endfor %}
   </tbody>

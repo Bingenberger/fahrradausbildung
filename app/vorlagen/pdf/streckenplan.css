@@ -1,0 +1,38 @@
+/* Streckenplan: Übersichtsseite, dann eine A4-Seite je Posten. Austauschbar je Schule. */
+
+@page { size: A4; margin: 14mm 16mm 14mm 16mm; }
+
+body { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; font-size: 10.5pt; color: #000; line-height: 1.35; }
+
+.blatt { page-break-after: always; }
+.blatt:last-child { page-break-after: auto; }
+
+.kopf { display: flex; justify-content: space-between; font-size: 9pt; border-bottom: 1px solid #000; padding-bottom: 2mm; }
+
+.postennummer { margin: 5mm 0 0; font-size: 12pt; }
+h1 { font-size: 21pt; margin: 2mm 0 2mm; line-height: 1.15; }
+h2 { font-size: 12.5pt; margin: 5mm 0 2mm; }
+.beschreibung { margin: 0 0 2mm; }
+
+.kennzahlen { display: flex; gap: 10mm; list-style: none; margin: 3mm 0 4mm; padding: 0; }
+.kennzahlen li { display: flex; flex-direction: column; }
+.kennzahlen span { font-size: 8.5pt; color: #333; }
+.kennzahlen strong { font-size: 14pt; }
+
+/* Höhen passend zu den Pixelgrößen in app/pdf.py – sonst wird die Karte verzerrt. */
+.uebersicht, .nahaufnahme { margin: 0; }
+.uebersicht img, .nahaufnahme img { display: block; width: 170mm; border: 0.75pt solid #000; border-radius: 2mm; }
+.uebersicht img { height: 141.7mm; }
+.nahaufnahme img { height: 121.8mm; }
+.uebersicht figcaption, .nahaufnahme figcaption { font-size: 8.5pt; color: #333; margin-top: 1mm; }
+
+.ohne-karte { border: 0.75pt solid #000; border-radius: 2mm; padding: 4mm; margin: 2mm 0 0; font-size: 10pt; }
+
+.posten { width: 100%; border-collapse: collapse; }
+.posten th, .posten td { text-align: left; vertical-align: top; padding: 1.4mm 2mm; border-bottom: 0.5pt solid #777; }
+.posten th { width: 8mm; }
+.posten .ort { width: 42mm; font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; color: #333; }
+
+.items { width: 100%; border-collapse: collapse; }
+.items th, .items td { text-align: left; vertical-align: top; padding: 1.4mm 2mm; border-bottom: 0.5pt solid #777; }
+.items th { width: 45mm; font-size: 11pt; }

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Streckenplan {{ strecke.name }}</title>
+</head>
+<body>
+
+<section class="blatt">
+  <header class="kopf">
+    <div>{{ schule_name }}</div>
+    <div>Streckenplan · Stand {{ stand|datum }}</div>
+  </header>
+
+  <h1>{{ strecke.name }}{% if strecke.archiviert %} (archiviert){% endif %}</h1>
+  {% if strecke.beschreibung %}<p class="beschreibung">{{ strecke.beschreibung }}</p>{% endif %}
+
+  <ul class="kennzahlen">
+    <li><span>Länge der Strecke</span><strong>{{ laenge_m|laenge }}</strong></li>
+    <li><span>Posten</span><strong>{{ blaetter|length }}</strong></li>
+    <li><span>davon verortet</span><strong>{{ verortet }}</strong></li>
+  </ul>
+
+  {% if uebersicht %}
+    <figure class="uebersicht">
+      <img src="{{ uebersicht }}" alt="Übersichtskarte der Prüfungsstrecke mit allen Posten">
+      <figcaption>Rot: die Strecke der Kinder. Schwarze Punkte: die Posten in Fahrreihenfolge.</figcaption>
+    </figure>
+  {% else %}
+    <p class="ohne-karte">Keine Übersichtskarte: {% if blaetter and not verortet and not laenge_m %}Für diese Strecke ist
+      noch kein Verlauf eingezeichnet und kein Posten verortet.{% else %}Die Kartenbilder konnten nicht geladen
+      werden.{% endif %}</p>
+  {% endif %}
+
+  <h2>Posten in Fahrreihenfolge</h2>
+  <table class="posten">
+    {% for b in blaetter %}
+      <tr>
+        <th>{{ b.nummer }}</th>
+        <td>{{ b.posten.name }}</td>
+        <td class="ort">{% if b.posten.lat is not none %}{{ "%.5f"|format(b.posten.lat) }}, {{ "%.5f"|format(b.posten.lng) }}{% else %}ohne Standort{% endif %}</td>
+      </tr>
+    {% endfor %}
+  </table>
+</section>
+
+{% for b in blaetter %}
+<section class="blatt">
+  <header class="kopf">
+    <div>{{ schule_name }} · {{ strecke.name }}</div>
+    <div>Posten {{ b.nummer }} von {{ blaetter|length }}</div>
+  </header>
+
+  <p class="postennummer">Posten {{ b.nummer }}</p>
+  <h1>{{ b.posten.name }}</h1>
+  {% if b.posten.beschreibung %}<p class="beschreibung">{{ b.posten.beschreibung }}</p>{% endif %}
+
+  {% if b.karte %}
+    <figure class="nahaufnahme">
+      <img src="{{ b.karte }}" alt="Karte des Postenstandorts in sehr hoher Zoomstufe">
+      <figcaption>Gelber Punkt {{ b.nummer }}: dieser Posten. Rot: die Strecke der Kinder.
+        Zoomstufe {{ zoom_posten }} · Standort {{ "%.5f"|format(b.posten.lat) }}, {{ "%.5f"|format(b.posten.lng) }}</figcaption>
+    </figure>
+  {% elif b.posten.lat is none %}
+    <p class="ohne-karte">Dieser Posten hat noch keinen Standort auf der Karte.
+      Nachtragen unter „Strecken → {{ strecke.name }} → Auf der Karte planen".</p>
+  {% else %}
+    <p class="ohne-karte">Die Kartenbilder konnten nicht geladen werden.</p>
+  {% endif %}
+
+  {% if b.posten.items %}
+    <h2>Darauf wird hier geachtet</h2>
+    <table class="items">
+      {% for i in b.posten.items %}
+        <tr><th>{{ i.kurzbezeichnung }}</th><td>{{ i.beobachtungstext }}</td></tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+</section>
+{% endfor %}
+
+</body>
+</html>

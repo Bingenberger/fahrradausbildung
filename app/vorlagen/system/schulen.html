@@ -1,34 +1,53 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld with context %}
+{% from "_makros.html" import csrf_feld, leerzustand with context %}
 {% block titel %}Schulen{% endblock %}
 {% block inhalt %}
-<h1>Schulen</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <h1>Schulen</h1>
+    <p class="seitenkopf-bei"><span>{{ symbol("buildings") }} Mandanten dieser Installation</span></p>
+  </div>
+  <div class="aktionsleiste">
+    <a class="knopf knopf-haupt" href="#neu">{{ symbol("plus") }} Neue Schule</a>
+  </div>
+</div>
+
 <section class="karte">
   {% if schulen %}
-    <table class="tabelle">
-      <thead><tr><th>Name</th><th>Kurzname</th><th>Status</th><th>angelegt</th></tr></thead>
-      <tbody>
-        {% for s in schulen %}
-          <tr {% if not s.aktiv %}class="archiviert"{% endif %}>
-            <td><a href="/system/schulen/{{ s.id }}">{{ s.name }}</a></td>
-            <td>{{ s.kurzname }}</td>
-            <td>{{ "aktiv" if s.aktiv else "deaktiviert" }}</td>
-            <td>{{ s.erstellt_am|datum }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="tabelle-rahmen">
+      <table class="tabelle">
+        <thead><tr><th>Name</th><th>Kurzname</th><th>Status</th><th>angelegt</th></tr></thead>
+        <tbody>
+          {% for s in schulen %}
+            <tr {% if not s.aktiv %}class="archiviert"{% endif %}>
+              <td><a href="/system/schulen/{{ s.id }}">{{ s.name }}</a></td>
+              <td><code>{{ s.kurzname }}</code></td>
+              <td>
+                {% if s.aktiv %}
+                  <span class="status status-laufend">{{ symbol("check") }} aktiv</span>
+                {% else %}
+                  <span class="marke-archiv">{{ symbol("archive") }} deaktiviert</span>
+                {% endif %}
+              </td>
+              <td>{{ s.erstellt_am|datum }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p>Noch keine Schule angelegt.</p>
+    {{ leerzustand("buildings", "Noch keine Schule angelegt.") }}
   {% endif %}
 </section>
-<section class="karte">
-  <h2>Neue Schule</h2>
+
+<section class="karte" id="neu">
+  <h2>{{ symbol("plus") }} Neue Schule</h2>
   <form method="post" action="/system/schulen/neu" class="formular formular-reihe">
     {{ csrf_feld() }}
     <label>Name <input type="text" name="name" maxlength="200" required placeholder="Grundschule am Park"></label>
-    <label>Kurzname <input type="text" name="kurzname" maxlength="50" required placeholder="gs-park"></label>
-    <button type="submit" class="knopf knopf-haupt">Schule anlegen</button>
+    <label>Kurzname <span class="hilfe">für Vorlagenordner und Dateinamen</span>
+      <input type="text" name="kurzname" maxlength="50" required placeholder="gs-park"></label>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("plus") }} Schule anlegen</button>
   </form>
 </section>
 {% endblock %}

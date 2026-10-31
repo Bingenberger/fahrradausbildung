@@ -1,14 +1,20 @@
-"""Statischer Kartenausschnitt für das Posten-Blatt (PNG).
+"""Statische Kartenausschnitte für Posten-Blatt und Streckenplan (PNG).
 
 WeasyPrint führt kein JavaScript aus; deshalb setzt der Server das Bild selbst
 aus Kartenkacheln zusammen und zeichnet Strecke und Posten darüber.
 
 Die Kacheln kommen von ``FP_KARTEN_KACHELN`` (Standard: OpenStreetMap
 Deutschland). Ist die Variable leer oder der Server nicht erreichbar, hat das
-Posten-Blatt eben keine Karte – das Drucken scheitert daran nie.
+Blatt eben keine Karte – das Drucken scheitert daran nie.
 
 Kachel-Nutzungsbedingungen: wenige Abrufe, eigener User-Agent, Zwischenspeicher
-im Arbeitsspeicher. Benachbarte Posten teilen sich die meisten Kacheln.
+im Arbeitsspeicher. Benachbarte Posten teilen sich auf dem Posten-Blatt die
+meisten Kacheln; im Streckenplan (ZOOM_POSTEN) hat jeder Posten eigene.
+
+tile.openstreetmap.de antwortet auf hohen Zoomstufen gelegentlich mit 404,
+obwohl dieselbe Kachel beim nächsten Versuch kommt. Darum wird wiederholt und
+notfalls die gröbere Kachel darüber vergrößert – ein unscharfes Viertel ist
+besser als ein beiges Loch mitten in der Kreuzung.
 """
 
 from __future__ import annotations
@@ -17,6 +23,8 @@ import io
 import logging
 import math
 import threading
+import time
+import urllib.error
 import urllib.request
 from collections import OrderedDict
 from collections.abc import Sequence
@@ -29,9 +37,21 @@ from app.config import einstellungen
 log = logging.getLogger(__name__)
 
 KACHEL = 256
-ZOOM = 17
+ZOOM = 17  # Posten-Blatt: Standort im Umfeld
+ZOOM_POSTEN = 19  # Streckenplan: einzelner Posten, sehr hoch gezoomt
+# Grenzen für ausschnitt(): näher als 19 wird die Darstellung nicht genauer,
+# gröber als 3 ist kein Schulweg mehr zu erkennen.
+ZOOM_MAX = 19
+ZOOM_MIN = 3
+ERDRADIUS = 6_371_000.0
 LINIENFARBE = (198, 40, 40)
 NENNUNG = "© OpenStreetMap-Mitwirkende"
+
+# Vorübergehende Serverfehler: wiederholen. Alles andere (kein Netz, kaputtes
+# Bild) scheitert sofort, damit ein abgeschalteter Server nicht bremst.
+VERSUCHE = 3
+WARTEN = 0.3
+VORUEBERGEHEND = frozenset({404, 408, 429, 500, 502, 503, 504})
 
 _cache: OrderedDict[str, Image.Image] = OrderedDict()
 _cache_sperre = threading.Lock()
@@ -47,18 +67,49 @@ def _kachel_holen(url: str) -> bytes:
         return antwort.read()
 
 
-def _kachel(z: int, x: int, y: int) -> Image.Image | None:
+def _laden(url: str, z: int) -> Image.Image | None:
+    """Kachel holen, bei vorübergehenden Serverfehlern erneut versuchen."""
+    for versuch in range(1, VERSUCHE + 1):
+        try:
+            return Image.open(io.BytesIO(_kachel_holen(url))).convert("RGB")
+        except urllib.error.HTTPError as fehler:
+            if fehler.code not in VORUEBERGEHEND or versuch == VERSUCHE:
+                log.warning("Kartenkachel nicht geladen (z=%s): HTTP %s", z, fehler.code)
+                return None
+            time.sleep(WARTEN * versuch)
+        except Exception as fehler:  # kein Netz, kaputtes Bild – Karte ist optional
+            log.warning("Kartenkachel nicht geladen (z=%s): %s", z, type(fehler).__name__)
+            return None
+    return None  # pragma: no cover
+
+
+def _ersatz(z: int, x: int, y: int) -> Image.Image | None:
+    """Fehlende Kachel durch das vergrößerte Viertel der gröberen darüber ersetzen.
+
+    Dasselbe, was der Browser über ``maxNativeZoom`` tut (app/static/karte.js).
+    Nur eine Stufe – fehlt auch die, bleibt die Fläche leer.
+    """
+    if z <= ZOOM_MIN:
+        return None
+    gruppe = _kachel(z - 1, x // 2, y // 2, ersatz=False)
+    if gruppe is None:
+        return None
+    h = KACHEL // 2
+    links, oben = (x % 2) * h, (y % 2) * h
+    return gruppe.crop((links, oben, links + h, oben + h)).resize((KACHEL, KACHEL), Image.BICUBIC)
+
+
+def _kachel(z: int, x: int, y: int, ersatz: bool = True) -> Image.Image | None:
     vorlage = einstellungen().karten_kacheln
     url = vorlage.replace("{z}", str(z)).replace("{x}", str(x)).replace("{y}", str(y))
     with _cache_sperre:
         if url in _cache:
             _cache.move_to_end(url)
             return _cache[url]
-    try:
-        bild = Image.open(io.BytesIO(_kachel_holen(url))).convert("RGB")
-    except Exception as fehler:  # Netz, HTTP-Fehler, kaputtes Bild – Karte ist optional
-        log.warning("Kartenkachel nicht geladen (z=%s): %s", z, type(fehler).__name__)
-        return None
+    bild = _laden(url, z)
+    if bild is None:
+        # Nicht zwischenspeichern: beim nächsten Bild darf es wieder klappen.
+        return _ersatz(z, x, y) if ersatz else None
     with _cache_sperre:
         _cache[url] = bild
         while len(_cache) > CACHE_GROESSE:
@@ -71,6 +122,47 @@ def _pixel(lat: float, lng: float, z: int) -> tuple[float, float]:
     n = KACHEL * 2**z
     s = math.sin(math.radians(max(min(lat, 85.0511), -85.0511)))
     return (lng + 180) / 360 * n, (0.5 - math.log((1 + s) / (1 - s)) / (4 * math.pi)) * n
+
+
+def _unpixel(x: float, y: float, z: int) -> tuple[float, float]:
+    """Weltpixel in Web-Mercator auf Zoomstufe z → WGS84."""
+    n = KACHEL * 2**z
+    lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / n))))
+    return lat, x / n * 360 - 180
+
+
+def laenge_meter(linie: Sequence[Sequence[float]]) -> float:
+    """Länge eines Linienzugs in Metern (Kugelnäherung – genau genug für Schulwege)."""
+    summe = 0.0
+    for (lat1, lng1), (lat2, lng2) in zip(linie, linie[1:]):
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dp, dl = p2 - p1, math.radians(lng2 - lng1)
+        h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+        summe += 2 * ERDRADIUS * math.asin(min(1.0, math.sqrt(h)))
+    return summe
+
+
+def ausschnitt(
+    punkte: Sequence[Sequence[float]],
+    breite: int,
+    hoehe: int,
+    rand: int = 48,
+    hoechstens: int = ZOOM_MAX,
+) -> tuple[tuple[float, float], int]:
+    """Mitte und höchste Zoomstufe, auf der alle ``punkte`` in breite×hoehe passen.
+
+    ``rand`` hält die äußersten Punkte von der Bildkante weg – dort sitzen die
+    Postenkreise. Für einen einzelnen Punkt kommt ``hoechstens`` heraus.
+    """
+    if not punkte:
+        raise ValueError("ausschnitt braucht mindestens einen Punkt")
+    for z in range(hoechstens, ZOOM_MIN - 1, -1):
+        px = [_pixel(p[0], p[1], z) for p in punkte]
+        xs, ys = [q[0] for q in px], [q[1] for q in px]
+        passt = max(xs) - min(xs) <= breite - 2 * rand and max(ys) - min(ys) <= hoehe - 2 * rand
+        if passt or z == ZOOM_MIN:
+            return _unpixel((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, z), z
+    raise AssertionError("unerreichbar")  # pragma: no cover
 
 
 def _schrift(groesse: int) -> ImageFont.ImageFont:

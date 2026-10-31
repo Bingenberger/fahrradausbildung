@@ -1,5 +1,5 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld with context %}
+{% from "_makros.html" import csrf_feld, pdf_knopf with context %}
 {% block titel %}Karte · {{ strecke.name }}{% endblock %}
 {% block kopf %}
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
@@ -9,8 +9,18 @@
 {% endblock %}
 {% block hauptklasse %}inhalt inhalt-breit{% endblock %}
 {% block inhalt %}
-<p class="brotkrumen"><a href="/verwaltung/strecken">Strecken</a> › <a href="/verwaltung/strecken/{{ strecke.id }}">{{ strecke.name }}</a> ›</p>
-<h1>Karte: {{ strecke.name }}</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <p class="brotkrumen">
+      <a href="/verwaltung/strecken">Strecken</a> {{ symbol("caret-right") }}
+      <a href="/verwaltung/strecken/{{ strecke.id }}">{{ strecke.name }}</a> {{ symbol("caret-right") }}
+    </p>
+    <h1>Karte: {{ strecke.name }}</h1>
+  </div>
+  <div class="aktionsleiste">
+    {{ pdf_knopf("/verwaltung/strecken/%d/streckenplan.pdf"|format(strecke.id), "Streckenplan (PDF)") }}
+  </div>
+</div>
 
 {# Daten für karte.js – kein ausführbares Skript, daher mit der CSP verträglich #}
 <script type="application/json" id="kartendaten">{{ daten|tojson }}</script>
@@ -21,12 +31,12 @@
       {{ csrf_feld() }}
       <input type="hidden" name="verlauf" id="feld-verlauf">
       <input type="hidden" name="orte" id="feld-orte">
-      <button type="submit" class="knopf knopf-haupt breit" id="speichern">Speichern</button>
-      <p class="hilfe" id="ungespeichert" hidden>Es gibt ungespeicherte Änderungen.</p>
+      <button type="submit" class="knopf knopf-haupt breit" id="speichern">{{ symbol("floppy-disk") }} Speichern</button>
+      <p class="hilfe" id="ungespeichert" hidden>{{ symbol("warning") }} Es gibt ungespeicherte Änderungen.</p>
     </form>
 
     <section class="karte-block">
-      <h2>Was tust du gerade?</h2>
+      <h2>{{ symbol("pencil-simple") }} Was tust du gerade?</h2>
       <div class="modi" role="radiogroup">
         <label class="opt"><input type="radio" name="modus" value="posten" checked>
           <span><b>Posten verorten</b> – Posten wählen, dann auf die Karte klicken</span></label>
@@ -39,7 +49,7 @@
     </section>
 
     <section class="karte-block">
-      <h2>Posten</h2>
+      <h2>{{ symbol("map-pin") }} Posten</h2>
       {% if not daten.posten %}
         <p class="hilfe">Diese Strecke hat noch keine Posten. Lege sie auf der <a href="/verwaltung/strecken/{{ strecke.id }}">Streckenseite</a> an.</p>
       {% endif %}
@@ -47,7 +57,7 @@
     </section>
 
     <section class="karte-block">
-      <h2>Strecke</h2>
+      <h2>{{ symbol("path") }} Strecke</h2>
       <div class="kennzahl"><span>Länge</span><b id="laenge">–</b></div>
       <label class="feld">Routing
         <select id="routing">
@@ -63,8 +73,8 @@
       <label class="opt"><input type="checkbox" id="kein-wenden" checked>
         <span>Kein Wenden auf der Stelle – die Strecke dreht über Kreisverkehr oder Block</span></label>
       <div class="knopfreihe">
-        <button type="button" class="knopf knopf-klein" id="zurueck">Letzten Punkt zurück</button>
-        <button type="button" class="knopf knopf-klein knopf-gefahr-leise" id="leeren">Strecke leeren</button>
+        <button type="button" class="knopf knopf-klein" id="zurueck">{{ symbol("arrow-counter-clockwise") }} Letzten Punkt zurück</button>
+        <button type="button" class="knopf knopf-klein knopf-gefahr-leise" id="leeren">{{ symbol("trash") }} Strecke leeren</button>
       </div>
       <label class="feld">Aus Datei übernehmen (GPX, KML, GeoJSON)
         <input type="file" id="datei" accept=".kml,.gpx,.geojson,.json">
@@ -73,25 +83,26 @@
     </section>
 
     <section class="karte-block">
-      <h2>Karte</h2>
+      <h2>{{ symbol("map-trifold") }} Karte</h2>
       <form class="suche" id="suche">
         <label class="feld">Ort suchen <input type="text" id="suchtext" placeholder="z. B. Schulstraße 1, Musterstadt"></label>
-        <button type="submit" class="knopf knopf-klein">Suchen</button>
+        <button type="submit" class="knopf knopf-klein">{{ symbol("magnifying-glass") }} Suchen</button>
       </form>
       <label class="feld">Kartenstil <select id="quelle"></select></label>
       <p class="hilfe" id="quelle-nennung"></p>
+      <p class="hilfe" id="zoom-hinweis" hidden></p>
       <div id="andere-liste"></div>
     </section>
 
     <section class="karte-block">
-      <h2>Bild exportieren</h2>
+      <h2>{{ symbol("download-simple") }} Bild exportieren</h2>
       <label class="opt"><input type="checkbox" id="opt-grau"> Graustufen (druckfreundlich)</label>
       <label class="opt"><input type="checkbox" id="opt-legende" checked> Legende und Maßstab</label>
       <label class="opt"><input type="checkbox" id="opt-posten" checked> Postennummern</label>
       <label class="opt"><input type="checkbox" id="opt-2x" checked> Doppelte Auflösung</label>
       <div class="knopfreihe">
-        <button type="button" class="knopf knopf-klein" id="export-svg">SVG herunterladen</button>
-        <button type="button" class="knopf knopf-klein" id="export-png">PNG</button>
+        <button type="button" class="knopf knopf-klein" id="export-svg">{{ symbol("download-simple") }} SVG</button>
+        <button type="button" class="knopf knopf-klein" id="export-png">{{ symbol("download-simple") }} PNG</button>
       </div>
       <p class="hilfe">Exportiert wird der sichtbare Kartenausschnitt, z. B. für einen Elternbrief.</p>
     </section>

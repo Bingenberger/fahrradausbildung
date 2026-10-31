@@ -13,48 +13,54 @@ from __future__ import annotations
 
 ATTRIBUTION = "Kartendaten © OpenStreetMap-Mitwirkende (ODbL)"
 
-# Schlüssel → Anzeigename, Kachel-URL (Leaflet-Schreibweise), Subdomains, maximale Zoomstufe, Nennung
+# Höchste Zoomstufe der Karte im Browser – für alle Kartenstile gleich.
+# Darüber hinaus liefert kein Dienst eigene Kacheln; Leaflet vergrößert dann die
+# letzte vorhandene Stufe (maxNativeZoom), statt eine graue Fläche zu zeigen.
+MAX_ZOOM = 20
+
+# Schlüssel → Anzeigename, Kachel-URL (Leaflet-Schreibweise), Subdomains,
+# höchste Zoomstufe mit eigenen Kacheln (maxNativeZoom, vom Dienst abhängig), Nennung
 KACHELN: dict[str, dict] = {
     "cyclosm": {
         "label": "CyclOSM – Radwege hervorgehoben",
         "url": "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png",
         "subs": ["a", "b", "c"],
-        "maxZoom": 19,
+        "maxNativeZoom": 19,
         "attr": ATTRIBUTION + ", Darstellung CyclOSM",
     },
     "osmde": {
         "label": "OpenStreetMap deutsch",
         "url": "https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png",
         "subs": ["a", "b", "c"],
-        "maxZoom": 18,
+        "maxNativeZoom": 18,
         "attr": ATTRIBUTION,
     },
     "osmfr": {
         "label": "OpenStreetMap Frankreich",
         "url": "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
         "subs": ["a", "b", "c"],
-        "maxZoom": 19,
+        "maxNativeZoom": 19,
         "attr": ATTRIBUTION + ", Darstellung OpenStreetMap France",
     },
     "hot": {
         "label": "Humanitarian – hell, klare Straßen",
         "url": "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
         "subs": ["a", "b"],
-        "maxZoom": 19,
+        "maxNativeZoom": 19,
         "attr": ATTRIBUTION + ", Darstellung Humanitarian OSM Team",
     },
     "topo": {
         "label": "OpenTopoMap",
         "url": "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
         "subs": ["a", "b", "c"],
-        "maxZoom": 17,
+        "maxNativeZoom": 17,
         "attr": ATTRIBUTION + ", Darstellung © OpenTopoMap (CC-BY-SA)",
     },
     "osm": {
         "label": "OpenStreetMap Standard",
         "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "subs": [],
-        "maxZoom": 19,
+        "maxNativeZoom": 19,
         "attr": ATTRIBUTION,
     },
 }
@@ -83,4 +89,4 @@ def verbindungsziele() -> list[str]:
 
 
 def fuer_browser() -> dict:
-    return {"kacheln": KACHELN, "routing": ROUTING, "ortssuche": ORTSSUCHE}
+    return {"kacheln": KACHELN, "maxZoom": MAX_ZOOM, "routing": ROUTING, "ortssuche": ORTSSUCHE}

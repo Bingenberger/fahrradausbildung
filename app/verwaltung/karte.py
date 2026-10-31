@@ -68,6 +68,18 @@ def verlauf_pruefen(roh: str) -> dict[str, Any] | None:
         daten = json.loads(roh)
     except ValueError as fehler:
         raise Ungueltig("kein gültiges JSON") from fehler
+    return verlauf_aus_daten(daten)
+
+
+def verlauf_aus_daten(daten: Any) -> dict[str, Any] | None:
+    """Schon gelesener Verlauf → gespeicherte Form.
+
+    Getrennt von ``verlauf_pruefen``, weil der Streckenimport
+    (``app/verwaltung/export.py``) den Verlauf aus einer Datei bekommt und nicht
+    als Formulartext. Beide Wege sollen dieselben Grenzen sehen.
+    """
+    if daten is None:
+        return None
     if not isinstance(daten, dict) or set(daten) - {"modus", "wegpunkte", "linie"}:
         raise Ungueltig("unbekannte Felder")
     modus = daten.get("modus", "route")
@@ -78,6 +90,20 @@ def verlauf_pruefen(roh: str) -> dict[str, Any] | None:
     if len(linie) < 2:
         return None
     return {"modus": modus, "wegpunkte": wegpunkte, "linie": linie}
+
+
+def ort_pruefen(lat: Any, lng: Any) -> list[float] | None:
+    """Standort eines Postens: entweder beide Werte oder keiner.
+
+    Dieselbe Bedingung prüft die Datenbank (CheckConstraint „ort" in
+    ``app/modelle.py``) – hier abgefangen, damit eine krumme Importdatei eine
+    Meldung ergibt und keinen Datenbankfehler.
+    """
+    if lat is None and lng is None:
+        return None
+    if lat is None or lng is None:
+        raise Ungueltig("Standort braucht Breite und Länge")
+    return _punkt([lat, lng])
 
 
 def orte_pruefen(roh: str, posten_ids: set[int]) -> dict[int, list[float] | None]:

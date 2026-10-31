@@ -11,6 +11,7 @@ Statt page.wait_for_function("…") deshalb expect(locator)… verwenden.
 
 from __future__ import annotations
 
+import re
 import socket
 import threading
 import time
@@ -440,3 +441,115 @@ def test_lesbarkeitspruefung_erkennt_verstoesse(seite):
     probleme = seite.evaluate(LESBARKEIT_JS)
     assert any("12px" in p for p in probleme)
     assert any("Kontrast" in p for p in probleme)
+
+
+# --------------------------------------------------------------------------- Display wachhalten
+
+
+# Attrappe der Screen Wake Lock API: WebKit im Test hat sie nicht, und der
+# Energiesparmodus eines echten iPads lässt sich hier ohnehin nicht herstellen.
+WAKE_ATTRAPPE = """
+window.__wake = { angefordert: 0, freigegeben: 0, ablehnen: false, letzte: null };
+Object.defineProperty(navigator, "wakeLock", {
+  configurable: true,
+  value: {
+    request: async (typ) => {
+      window.__wake.angefordert++;
+      if (window.__wake.ablehnen) throw new DOMException("Energiesparmodus", "NotAllowedError");
+      const ziel = new EventTarget();
+      const sperre = {
+        type: typ,
+        released: false,
+        addEventListener: (...a) => ziel.addEventListener(...a),
+        removeEventListener: (...a) => ziel.removeEventListener(...a),
+        release: async () => {
+          window.__wake.freigegeben++;
+          sperre.released = true;
+          ziel.dispatchEvent(new Event("release"));
+        },
+      };
+      window.__wake.letzte = sperre;
+      return sperre;
+    },
+  },
+});
+"""
+
+OHNE_WAKE = """
+Object.defineProperty(navigator, "wakeLock", { configurable: true, get: () => undefined });
+"""
+
+
+@pytest.fixture
+def wach_seite(browser, geraete, basis_url):
+    """Seite mit frei wählbarer Wake-Lock-Attrappe, noch vor „Prüfung starten“."""
+
+    kontexte = []
+
+    def oeffnen(skript: str):
+        ctx = browser.new_context(**geraete[GERAETE[0]])
+        kontexte.append(ctx)
+        page = ctx.new_page()
+        page.fp_fehler = []
+        page.on("pageerror", lambda e: page.fp_fehler.append(str(e)))
+        page.add_init_script(skript)
+        page.goto(f"{basis_url}/p/demo?zuruecksetzen")
+        page.wait_for_selector("#einrichtung:not([hidden])")
+        return page
+
+    yield oeffnen
+    for ctx in kontexte:
+        ctx.close()
+
+
+def test_display_bleibt_waehrend_der_erfassung_an(wach_seite):
+    """Ohne Wake Lock müsste die Aufsicht vor jedem Kind erst entsperren."""
+    page = wach_seite(WAKE_ATTRAPPE)
+    expect(page.locator("#einrichtung-wach")).to_have_text("Das Display bleibt während der Prüfung an.")
+    assert page.evaluate("() => window.__wake.angefordert") == 0  # erst beim Erfassen
+
+    page.click("#start")
+    page.wait_for_selector("#haupt:not([hidden])")
+    expect(page.locator("#status-zaehler")).not_to_contain_text("Display")
+    assert page.evaluate("() => window.__wake.angefordert") == 1
+    assert page.evaluate("() => window.__wake.letzte.type") == "screen"
+    assert page.fp_fehler == []
+
+
+def test_wake_lock_wird_nach_dem_wegschalten_neu_angefordert(wach_seite):
+    """Das System gibt die Sperre beim Wegtippen frei – sonst wäre sie dann weg."""
+    page = wach_seite(WAKE_ATTRAPPE)
+    page.click("#start")
+    page.wait_for_selector("#haupt:not([hidden])")
+
+    # App war im Hintergrund: System gibt frei, beim Zurückkommen neu anfordern
+    page.evaluate("() => window.__wake.letzte.release()")
+    page.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+    page.wait_for_timeout(200)
+    assert page.evaluate("() => window.__wake.angefordert") == 2
+    assert page.fp_fehler == []
+
+
+def test_abgelehnte_sperre_wird_in_der_statuszeile_gesagt(wach_seite):
+    """Energiesparmodus: Die Aufsicht soll es wissen, die Erfassung läuft weiter."""
+    page = wach_seite(WAKE_ATTRAPPE + "window.__wake.ablehnen = true;")
+    page.click("#start")
+    page.wait_for_selector("#haupt:not([hidden])")
+    expect(page.locator("#status-zaehler")).to_contain_text("Display sperrt sich")
+    expect(page.locator("#status-zaehler")).to_have_class(re.compile("warnung"))
+    # Erfassen geht trotzdem
+    page.click("#weiter")
+    page.wait_for_timeout(750)
+    assert gueltige_durchgaenge(page)
+    assert page.fp_fehler == []
+
+
+def test_altes_geraet_ohne_wake_lock_bekommt_die_einstellung_gesagt(wach_seite):
+    page = wach_seite(OHNE_WAKE)
+    expect(page.locator("#einrichtung-wach")).to_contain_text("Automatische Sperre")
+    page.click("#start")
+    page.wait_for_selector("#haupt:not([hidden])")
+    # Kein Hinweis in der Statuszeile: Dort wäre er bei jedem Kind im Weg,
+    # und ändern lässt sich daran am Posten nichts mehr.
+    expect(page.locator("#status-zaehler")).not_to_contain_text("Display")
+    assert page.fp_fehler == []

@@ -1,13 +1,19 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld, knopf, mit_rueckfrage with context %}
+{% from "_makros.html" import brotkrume, csrf_feld, knopf, leerzustand, mit_rueckfrage with context %}
 {% block titel %}{{ schule.name }}{% endblock %}
 {% block inhalt %}
-<p class="brotkrumen"><a href="/system">Schulen</a> ›</p>
-<h1>{{ schule.name }} {% if not schule.aktiv %}<span class="marke-archiv">deaktiviert</span>{% endif %}</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    {{ brotkrume("/system", "Schulen") }}
+    <h1>{{ schule.name }} {% if not schule.aktiv %}<span class="marke-archiv">{{ symbol("archive") }} deaktiviert</span>{% endif %}</h1>
+    <p class="seitenkopf-bei"><span>{{ symbol("buildings") }} Kurzname <code>{{ schule.kurzname }}</code></span></p>
+  </div>
+</div>
 
 <section class="karte">
-  <h2>Schuladmins</h2>
+  <h2>{{ symbol("user-circle") }} Schuladmins</h2>
   {% if admins %}
+    <div class="tabelle-rahmen">
     <table class="tabelle">
       <thead><tr><th>E-Mail</th><th>Status</th><th><span class="unsichtbar">Aktionen</span></th></tr></thead>
       <tbody>
@@ -17,43 +23,43 @@
             <td>{{ "aktiv" if b.aktiv else "deaktiviert" }}</td>
             <td><div class="aktionsleiste">
               {% if b.aktiv %}
-                {{ knopf("/system/benutzer/%d/deaktivieren"|format(b.id), "Deaktivieren", "knopf knopf-klein") }}
+                {{ knopf("/system/benutzer/%d/deaktivieren"|format(b.id), "Deaktivieren", "knopf knopf-klein", sym="x") }}
               {% else %}
-                {{ knopf("/system/benutzer/%d/aktivieren"|format(b.id), "Aktivieren", "knopf knopf-klein") }}
+                {{ knopf("/system/benutzer/%d/aktivieren"|format(b.id), "Aktivieren", "knopf knopf-klein", sym="check") }}
               {% endif %}
               {{ mit_rueckfrage("/system/benutzer/%d/passwort"|format(b.id), "Neues Passwort",
-                 "Das bisherige Passwort wird ungültig, laufende Anmeldungen enden.") }}
+                 "Das bisherige Passwort wird ungültig, laufende Anmeldungen enden.", sym="key") }}
             </div></td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% else %}
-    <p>Diese Schule hat noch keinen Schuladmin.</p>
+    {{ leerzustand("user-circle", "Diese Schule hat noch keinen Schuladmin. Lege unten einen an – das Startpasswort wird einmal angezeigt.") }}
   {% endif %}
   <h3>Schuladmin anlegen</h3>
   <form method="post" action="/system/schulen/{{ schule.id }}/admins" class="formular formular-reihe">
     {{ csrf_feld() }}
     <label>E-Mail-Adresse <input type="email" name="email" maxlength="254" required></label>
-    <button type="submit" class="knopf">Anlegen</button>
+    <button type="submit" class="knopf">{{ symbol("plus") }} Anlegen</button>
   </form>
   <p class="hilfe">Das Startpasswort wird einmal angezeigt. Gib es auf sicherem Weg weiter.</p>
 </section>
 
 <section class="karte">
-  <h2>Schule bearbeiten</h2>
+  <h2>{{ symbol("pencil-simple") }} Schule bearbeiten</h2>
   <form method="post" action="/system/schulen/{{ schule.id }}/bearbeiten" class="formular formular-reihe">
     {{ csrf_feld() }}
     <label>Name <input type="text" name="name" value="{{ schule.name }}" maxlength="200" required></label>
-    <button type="submit" class="knopf">Speichern</button>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("floppy-disk") }} Speichern</button>
   </form>
-  <p>Kurzname: <code>{{ schule.kurzname }}</code></p>
   <div class="aktionsleiste">
     {% if schule.aktiv %}
       {{ mit_rueckfrage("/system/schulen/%d/deaktivieren"|format(schule.id), "Deaktivieren",
-         "Die Schuladmins dieser Schule können sich danach nicht mehr anmelden. Daten bleiben erhalten.") }}
+         "Die Schuladmins dieser Schule können sich danach nicht mehr anmelden. Daten bleiben erhalten.", sym="x") }}
     {% else %}
-      {{ knopf("/system/schulen/%d/aktivieren"|format(schule.id), "Wieder aktivieren") }}
+      {{ knopf("/system/schulen/%d/aktivieren"|format(schule.id), "Wieder aktivieren", sym="arrow-counter-clockwise") }}
     {% endif %}
   </div>
 </section>

@@ -15,7 +15,8 @@
   border-radius: var(--radius);
   padding: 12px 14px;
 }
-.karte-block h2 { font-size: 16px; margin: 0 0 8px; }
+.karte-block h2 { font-size: 16px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.karte-block h2 .symbol { color: var(--text-leise); }
 .karte-block .opt { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; cursor: pointer; }
 .karte-block .feld { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-weight: 600; }
 .karte-block .feld select, .karte-block .feld input { font-weight: 400; }

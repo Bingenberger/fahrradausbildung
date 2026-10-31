@@ -61,10 +61,30 @@ Grundlage ist der eigenständige Kartengenerator `fahrradpruefung-karten.html`.
   entstehen über „Strecke duplizieren" und lassen sich zum Vergleich einblenden.
 - **Bild exportieren:** SVG oder PNG des sichtbaren Ausschnitts, mit Postennummern,
   Legende und Maßstab – z. B. für einen Elternbrief.
+- **Kartenstile und Zoom:** Die Obergrenze der Karte gilt für alle Stile gleich
+  (`MAX_ZOOM` in `app/kartenquellen.py`); je Stil ist zusätzlich die höchste Stufe
+  mit eigenen Kacheln hinterlegt (`maxNativeZoom`), darüber vergrößert Leaflet.
+  Ob ein Dienst eine Stufe auch für den konkreten Ort gerendert hat, zeigt erst
+  der Abruf – CyclOSM hat z. B. über Niederkassel ab Stufe 18 keine Bilder, über
+  Nürnberg schon. Bleibt eine Stufe ganz leer, zieht sich die Kartenseite auf die
+  Stufe darunter zurück und sagt es in der Statuszeile, statt grau zu bleiben.
+  Der gewählte Stil wird im Browser gemerkt.
 - **Posten-Blatt:** Hat ein Posten einen Standort, zeigt sein Blatt einen
   Kartenausschnitt mit Strecke und allen Posten; der eigene ist gelb hervorgehoben.
   Das Bild setzt der Server aus Kacheln zusammen (`app/kartenbild.py`,
   `FP_KARTEN_KACHELN`); ist der Kachelserver nicht erreichbar, fehlt nur die Karte.
+- **Export (JSON)** auf der Streckenseite (`/verwaltung/strecken/{id}/export.json`):
+  die Strecke mit allen Posten, deren Items und dem gezeichneten Verlauf in einer
+  Datei – zum Sichern vor einem Umbau oder zum Weitergeben an eine andere Schule.
+  Läufe, Zugänge und Erfassungen sind nicht enthalten, also nichts, was einem Kind
+  zuzuordnen wäre. Dieselbe Form steckt im Schulexport (`app/verwaltung/export.py`,
+  `streckendaten()`), damit beide nicht auseinanderlaufen.
+- **Streckenplan (PDF)** auf der Streckenseite
+  (`/verwaltung/strecken/{id}/streckenplan.pdf`): Seite 1 die Gesamtstrecke mit
+  Übersichtskarte (die Zoomstufe ergibt sich aus der Ausdehnung der Strecke),
+  Länge und Postenliste, danach je Posten eine Seite mit dem Standort in
+  Zoomstufe 19 – nah genug, dass die Einmündung auf dem Papier erkennbar ist.
+  Posten ohne Standort bekommen ihre Seite mit einem Hinweis statt der Karte.
 - Standorte und Verlauf bleiben änderbar, auch wenn schon Läufe an der Strecke hängen.
 
 **Externe Dienste und Sicherheit.** Nur die Kartenseite darf externe Server ansprechen,
@@ -103,7 +123,8 @@ Fehlersuche – steht in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 | `app/posten/` | Token-API und Auslieferung der Posten-App |
 | `app/posten_app/` | Posten-App: Vanilla-JS, IndexedDB (`idb`), Service Worker – kein Build-Schritt |
 | `app/auswertung.py`, `app/feedback.py` | Rechenregeln für Auswertung und Feedbackbogen (ohne Datenbank testbar) |
-| `app/vorlagen/` | Jinja2-Vorlagen; `pdf/` enthält Posten-Blatt und Feedbackbogen |
+| `app/vorlagen/` | Jinja2-Vorlagen; `_makros.html` enthält die Bausteine, `pdf/` Posten-Blatt, Streckenplan und Feedbackbogen |
+| `app/static/`, `app/web/symbole.py` | Stylesheets und Phosphor-Symbole (lokal, als Inline-SVG) |
 | `app/aufbewahrung.py`, `app/kommandos.py` | Löschfrist und Management-Kommandos |
 | `migrations/` | Alembic-Migrationen |
 | `tests/` | pytest; Playwright (Chromium, WebKit) für die Offline-Strecke |
@@ -141,6 +162,41 @@ Strecken, Posten, Items, Gruppen und Kinder.
 
 Weitere Kommandos: `uv run python -m app.kommandos --help`.
 
+## Oberfläche und Symbole
+
+Ein einziges Stylesheet trägt den Verwaltungsbereich: `app/static/verwaltung.css`,
+gegliedert in Token (Farben, Abstandsskala `--s1`…`--s7`, Radien) und Bausteine.
+Kein Build-Schritt, keine Framework-Abhängigkeit.
+
+Gestaltungsregeln, an denen sich neue Seiten ausrichten:
+
+- **Seitenkopf** (`.seitenkopf`): Brotkrume, Titel, eine Zeile Beiwerk
+  (`.seitenkopf-bei`) und rechts die Hauptaktionen – auf jeder Seite gleich.
+- **Eine Hauptaktion je Abschnitt** (`.knopf-haupt`), alles Weitere ruhig daneben;
+  gefährliche Aktionen nur mit Rückfrage (`mit_rueckfrage`, reines CSS).
+- **Leerzustände** (`.leerzustand`) statt leerer Kästen: Symbol, ein erklärender
+  Satz und der Knopf, der zum nächsten Schritt führt.
+- **Mindestens 40 px Trefferfläche**, sichtbarer Fokusring, Sprungmarke zum
+  Inhalt, `prefers-reduced-motion` und eigene Druckregeln.
+- **PDFs öffnen in einem neuen Tab** (Makro `pdf_knopf`, `target="_blank"` mit
+  unsichtbarem Hinweis für Screenreader): Die Blätter werden angesehen und
+  gedruckt, die Verwaltungsseite dahinter bleibt stehen. JSON-Exporte dagegen
+  werden heruntergeladen (`Content-Disposition: attachment`) und brauchen das
+  nicht.
+
+**Symbole** sind [Phosphor Icons](https://phosphoricons.com) 2.1.1 (MIT) und liegen
+lokal unter `app/static/vendor/phosphor/regular/` – nur die tatsächlich benutzten
+Dateien. `app/web/symbole.py` bettet sie beim Rendern als Inline-SVG ein
+(`{{ symbol("trash") }}`, in den Makros `sym="trash"`): keine zusätzliche Anfrage,
+keine Schriftdatei, die Symbole erben über `fill="currentColor"` die Textfarbe,
+und die strenge CSP braucht keine Ausnahme. Ein unbekannter Name wirft einen
+Fehler; `tests/test_gestaltung.py` prüft, dass jedes verwendete Symbol vorliegt
+und keine ungenutzte Datei liegen bleibt.
+
+Ein neues Symbol: Datei aus `assets/regular/` des Pakets `@phosphor-icons/core`
+nach `app/static/vendor/phosphor/regular/` kopieren, Dateiname ohne `.svg` ist
+der Name im Aufruf.
+
 ## Posten-App
 
 Aufruf über den QR-Code des Posten-Blatts: `/p/{token}`. Zum Üben ohne Lauf
@@ -173,6 +229,30 @@ Ablauf auf dem Gerät:
 Der Service Worker (`app/posten_app/sw.js`) bekommt seine Version vom Server:
 ein Hash über alle App-Dateien. Jede Änderung an der App ergibt automatisch
 einen neuen Cache; offline gespeicherte Seiten werden dabei übernommen.
+
+### Display anlassen (`app/posten_app/js/wachbleiben.js`)
+
+Das iPad liegt zwischen zwei Kindern still auf dem Tisch. Mit der üblichen
+automatischen Sperre müsste die Aufsicht vor jedem Kind erst entsperren – genau
+dann, wenn sie auf den Verkehr schauen soll. Die App fordert deshalb beim
+Wechsel in die Erfassungsansicht einen **Screen Wake Lock** an und erneuert ihn
+bei `visibilitychange`, weil das System ihn beim Wegschalten von selbst
+freigibt. Am Ende des Laufs wird er zurückgegeben.
+
+Grenzen, die die Oberfläche benennt:
+
+- Vor **iPadOS 16.4** gibt es die Schnittstelle nicht. Die Einrichtungsseite
+  sagt dann, dass „Automatische Sperre" auf „Nie" gestellt werden muss.
+- Im **Energiesparmodus** darf das Gerät die Anfrage ablehnen. Dann steht in der
+  Statusleiste „Display sperrt sich“ – die Erfassung läuft normal weiter.
+- Die **Helligkeit** lässt sich aus dem Browser nicht steuern; das automatische
+  Abdunkeln vor der Sperre entfällt mit dem Lock mit.
+
+Verlässlicher bleibt die Geräteeinstellung *Einstellungen → Anzeige & Helligkeit
+→ Automatische Sperre → Nie*, am besten per MDM-Profil auf allen Prüfungs-iPads.
+Der Wake Lock ist die Absicherung für Geräte, die nicht so eingerichtet wurden.
+Der Geführte Zugriff hilft hier übrigens nicht – er verhindert nur das Verlassen
+der App, nicht die Display-Sperre.
 
 ### Token-API (`app/posten/api.py`)
 

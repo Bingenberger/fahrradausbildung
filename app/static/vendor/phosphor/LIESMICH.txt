@@ -1,0 +1,10 @@
+Phosphor Icons 2.1.1 (@phosphor-icons/core), MIT-Lizenz – siehe LICENSE.
+https://phosphoricons.com
+
+Hier liegen nur die tatsächlich verwendeten Symbole der Strichstärke „regular".
+Eingebunden werden sie serverseitig als Inline-SVG über das Jinja-Makro
+``symbol()`` (app/web/symbole.py) – kein CDN, keine Schriftdatei, keine
+zusätzliche Anfrage, und die Content-Security-Policy bleibt unangetastet.
+
+Ein weiteres Symbol ergänzen: die passende Datei aus assets/regular/ des
+Pakets hierher kopieren; der Dateiname ohne „.svg" ist der Name im Makro.

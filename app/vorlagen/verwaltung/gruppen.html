@@ -1,38 +1,54 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld with context %}
+{% from "_makros.html" import csrf_feld, leerzustand with context %}
 {% block titel %}Gruppen{% endblock %}
 {% block inhalt %}
-<h1>Gruppen</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <h1>Gruppen</h1>
+    <p class="seitenkopf-bei"><span>{{ symbol("identification-badge") }} Eine Klasse mit ihren Startnummern – ohne Namen</span></p>
+  </div>
+  <div class="aktionsleiste">
+    <a class="knopf knopf-haupt" href="#neu">{{ symbol("plus") }} Neue Gruppe</a>
+  </div>
+</div>
 
 <section class="karte">
   {% if gruppen %}
-    <table class="tabelle">
-      <thead><tr><th>Name</th><th>Schuljahr</th><th>Startnummern</th><th>Status</th></tr></thead>
-      <tbody>
-        {% for g in gruppen %}
-          <tr {% if g.archiviert %}class="archiviert"{% endif %}>
-            <td><a href="/verwaltung/gruppen/{{ g.id }}">{{ g.name }}</a></td>
-            <td>{{ g.schuljahr }}</td>
-            <td>{{ anzahl.get(g.id, 0) }}</td>
-            <td>{{ "archiviert" if g.archiviert else "aktiv" }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="tabelle-rahmen">
+      <table class="tabelle">
+        <thead><tr><th>Name</th><th>Schuljahr</th><th class="zahl">Startnummern</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for g in gruppen %}
+            <tr {% if g.archiviert %}class="archiviert"{% endif %}>
+              <td><a href="/verwaltung/gruppen/{{ g.id }}">{{ g.name }}</a></td>
+              <td>{{ g.schuljahr }}</td>
+              <td class="zahl">{{ anzahl.get(g.id, 0) }}</td>
+              <td>
+                {% if g.archiviert %}
+                  <span class="marke-archiv">{{ symbol("archive") }} archiviert</span>
+                {% else %}
+                  <span class="status status-laufend">{{ symbol("check") }} aktiv</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p>Noch keine Gruppe angelegt.</p>
+    {{ leerzustand("users-three", "Noch keine Gruppe angelegt. Trage unten Name, Schuljahr und die Anzahl der Kinder ein – die Startnummern entstehen daraus automatisch.") }}
   {% endif %}
 </section>
 
-<section class="karte">
-  <h2>Neue Gruppe</h2>
+<section class="karte" id="neu">
+  <h2>{{ symbol("plus") }} Neue Gruppe</h2>
   <form method="post" action="/verwaltung/gruppen/neu" class="formular formular-reihe">
     {{ csrf_feld() }}
     <label>Name <input type="text" name="name" maxlength="200" required placeholder="z. B. 4a"></label>
     <label>Schuljahr <input type="text" name="schuljahr" maxlength="20" required placeholder="2026/27"></label>
-    <label>Anzahl Kinder <span class="hilfe">(Startnummern 1 bis …)</span>
+    <label>Anzahl Kinder <span class="hilfe">Startnummern 1 bis …</span>
       <input type="number" name="anzahl" min="1" max="999" placeholder="z. B. 24"></label>
-    <button type="submit" class="knopf knopf-haupt">Gruppe anlegen</button>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("plus") }} Gruppe anlegen</button>
   </form>
 </section>
 {% endblock %}

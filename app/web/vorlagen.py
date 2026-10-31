@@ -14,11 +14,13 @@ from app.config import einstellungen
 from app.formate import datum_kurz, datum_lang
 from app.web.abhaengigkeiten import fabrik, sitzung_optional
 from app.web.sitzung import meldungen_abholen
+from app.web.symbole import symbol
 
 VORLAGEN = Path(__file__).resolve().parent.parent / "vorlagen"
 
 templates = Jinja2Templates(directory=VORLAGEN)
 templates.env.globals["STUFEN"] = {1: "sicher", 2: "teilweise sicher", 3: "unsicher"}
+templates.env.globals["symbol"] = symbol
 
 
 def _zeit(wert) -> str:

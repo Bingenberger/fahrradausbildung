@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 from datetime import date
 from pathlib import Path
@@ -120,6 +121,187 @@ def test_item_kurzbezeichnung_pflicht_und_laenge(client, fabrik, schulen):
     client.post(f"/verwaltung/posten/{pid}/items", data={"kurzbezeichnung": "x" * 41, "csrf": csrf})
     with fabrik.intern_kontext() as s:
         assert s.get(Posten, pid).items == []
+
+
+def test_streckenexport_enthaelt_alle_posten_mit_items(client, fabrik, schulen):
+    """Eine Strecke zum Sichern oder Weitergeben – vollständig, aber ohne Kinderdaten."""
+    a, _ = schulen
+    csrf = angemeldet(client, a.email)
+    with fabrik.intern_kontext() as s:
+        strecke = s.get(Strecke, a.strecke)
+        strecke.beschreibung = "Start am Schultor."
+        strecke.verlauf = {"modus": "trace", "wegpunkte": [], "linie": [[50.814, 7.04], [50.816, 7.045]]}
+        strecke.posten[0].lat, strecke.posten[0].lng = 50.814, 7.04
+        zweiter = Posten(strecke=strecke, name="Rechts-vor-Links", position=2, beschreibung="Vor der Bäckerei.")
+        zweiter.items = [
+            Item(kurzbezeichnung="Handzeichen", beobachtungstext="Arm deutlich ausgestreckt?",
+                 uebungstext="Zeige früh an, wohin du willst.", position=1),
+            Item(kurzbezeichnung="Blick nach links", beobachtungstext="Schaut das Kind nach links?",
+                 uebungstext="Schau erst nach links.", position=2),
+        ]
+        s.add(zweiter)
+
+    antwort = client.get(f"/verwaltung/strecken/{a.strecke}/export.json")
+    assert antwort.status_code == 200
+    assert antwort.headers["content-type"].startswith("application/json")
+    assert antwort.headers["content-disposition"] == 'attachment; filename="strecke-runde-a.json"'
+    daten = antwort.json()
+
+    assert daten["format"] == "fahrradpruefung-strecke"
+    assert daten["schule"] == {"name": "Grundschule A", "kurzname": "A"}
+    strecke = daten["strecke"]
+    assert strecke["name"] == "Runde A" and strecke["beschreibung"] == "Start am Schultor."
+    assert strecke["verlauf"]["linie"] == [[50.814, 7.04], [50.816, 7.045]]
+
+    assert [p["name"] for p in strecke["posten"]] == ["Einmündung Lindenweg", "Rechts-vor-Links"]
+    erster, zweiter = strecke["posten"]
+    assert (erster["lat"], erster["lng"]) == (50.814, 7.04)
+    assert zweiter["lat"] is None and zweiter["beschreibung"] == "Vor der Bäckerei."
+    assert [i["kurzbezeichnung"] for i in erster["items"]] == ["Schulterblick"]
+    assert erster["items"][0]["uebungstext"] == "Übe den Schulterblick, bevor du abbiegst."
+    assert [i["kurzbezeichnung"] for i in zweiter["items"]] == ["Handzeichen", "Blick nach links"]
+    assert [i["position"] for i in zweiter["items"]] == [1, 2]
+
+    # Keine Spur von Läufen, Erfassungen oder Zugängen
+    assert set(daten) == {"format", "version", "erstellt_am", "schule", "strecke"}
+    assert set(strecke) == {"id", "name", "beschreibung", "archiviert", "verlauf", "posten"}
+    roh = antwort.text.lower()
+    for verboten in ("startnummer", "ereignis", "token", "gueltig_bis"):
+        assert verboten not in roh, verboten
+
+
+def test_streckenexport_nur_fuer_die_eigene_schule(client, schulen):
+    a, b = schulen
+    angemeldet(client, a.email)
+    assert client.get(f"/verwaltung/strecken/{b.strecke}/export.json").status_code == 404
+    assert client.get(f"/verwaltung/strecken/{a.strecke}/export.json").status_code == 200
+
+
+def test_streckenseite_verweist_auf_den_export(client, schulen):
+    a, _ = schulen
+    angemeldet(client, a.email)
+    html = client.get(f"/verwaltung/strecken/{a.strecke}").text
+    assert f"/verwaltung/strecken/{a.strecke}/export.json" in html
+
+
+def _importieren(client, csrf: str, inhalt: bytes):
+    return client.post(
+        "/verwaltung/strecken/importieren",
+        data={"csrf": csrf},
+        files={"datei": ("strecke.json", inhalt, "application/json")},
+    )
+
+
+def _datei(strecke: dict) -> bytes:
+    return json.dumps({"format": "fahrradpruefung-strecke", "version": 1, "strecke": strecke}).encode()
+
+
+def test_strecke_importieren_legt_neue_strecke_an(client, fabrik, schulen):
+    """Export der einen Schule, Import in der anderen – beide Richtungen müssen zusammenpassen."""
+    a, b = schulen
+    angemeldet(client, b.email)
+    with fabrik.intern_kontext() as s:
+        strecke = s.get(Strecke, b.strecke)
+        strecke.beschreibung = "Start am Schultor."
+        strecke.archiviert = True
+        strecke.verlauf = {"modus": "trace", "wegpunkte": [], "linie": [[50.814, 7.04], [50.816, 7.045]]}
+        strecke.posten[0].lat, strecke.posten[0].lng = 50.814, 7.04
+        zweiter = Posten(strecke=strecke, name="Rechts-vor-Links", position=2, beschreibung="Vor der Bäckerei.")
+        zweiter.items = [
+            # Absichtlich verdreht: die Reihenfolge soll aus „position" kommen.
+            Item(kurzbezeichnung="Handzeichen", beobachtungstext="Arm ausgestreckt?",
+                 uebungstext="Zeige früh an, wohin du willst.", position=2),
+            Item(kurzbezeichnung="Blick nach links", beobachtungstext="Schaut das Kind nach links?",
+                 uebungstext="Schau erst nach links.", position=1),
+        ]
+        s.add(zweiter)
+    datei = client.get(f"/verwaltung/strecken/{b.strecke}/export.json").content
+
+    csrf = angemeldet(client, a.email)
+    neu = _neue_id(_importieren(client, csrf, datei), "strecken")
+
+    with fabrik.intern_kontext() as s:
+        kopie = s.get(Strecke, neu)
+        assert kopie.schule_id == a.schule, "Import muss in der eigenen Schule landen"
+        assert kopie.name == "Runde B" and kopie.beschreibung == "Start am Schultor."
+        assert kopie.archiviert is False, "importierte Strecke gehört nicht ins Archiv"
+        assert kopie.verlauf["linie"] == [[50.814, 7.04], [50.816, 7.045]]
+        assert [(p.name, p.position) for p in kopie.posten] == [
+            ("Einmündung Lindenweg", 1),
+            ("Rechts-vor-Links", 2),
+        ]
+        erster, zweiter = kopie.posten
+        assert (erster.lat, erster.lng) == (50.814, 7.04)
+        assert (zweiter.lat, zweiter.lng) == (None, None)
+        assert zweiter.beschreibung == "Vor der Bäckerei."
+        assert erster.items[0].uebungstext == "Übe den Schulterblick, bevor du abbiegst."
+        assert [i.kurzbezeichnung for i in zweiter.items] == ["Blick nach links", "Handzeichen"]
+        assert [i.position for i in zweiter.items] == [1, 2]
+        # Keine ID aus der fremden Datei übernommen
+        assert {p.id for p in kopie.posten}.isdisjoint({b.posten})
+
+
+def test_strecke_import_macht_gleiche_namen_unterscheidbar(client, fabrik, schulen):
+    a, _ = schulen
+    csrf = angemeldet(client, a.email)
+    datei = client.get(f"/verwaltung/strecken/{a.strecke}/export.json").content
+    erste = _neue_id(_importieren(client, csrf, datei), "strecken")
+    zweite = _neue_id(_importieren(client, csrf, datei), "strecken")
+    with fabrik.intern_kontext() as s:
+        assert s.get(Strecke, erste).name == "Runde A (Import)"
+        assert s.get(Strecke, zweite).name == "Runde A (Import 2)"
+
+
+@pytest.mark.parametrize(
+    "inhalt, erwartet",
+    [
+        (b"das ist kein json", "kein gültiges JSON"),
+        (b'{"format": "fahrradpruefung-export", "version": 1}', "keine Datei aus"),
+        (_datei({"name": "X", "posten": []}).replace(b'"version": 1', b'"version": 99'), "Formatversion"),
+        (_datei({"name": "   ", "posten": []}), "keinen Namen"),
+        (_datei({"name": "X", "posten": [{"name": ""}]}), "Posten 1 hat keinen Namen"),
+        (_datei({"name": "X", "posten": [{"name": "P", "lat": 50.8}]}), "Standort braucht"),
+        (_datei({"name": "X", "posten": [{"name": "P", "lat": 200.0, "lng": 7.0}]}), "außerhalb"),
+        (
+            _datei({"name": "X", "posten": [{"name": "P", "items": [{"kurzbezeichnung": "x" * 41}]}]}),
+            "zu lang",
+        ),
+        (_datei({"name": "X", "posten": [{"name": "P", "items": [{}]}]}), "Kurzbezeichnung angeben"),
+        (_datei({"name": "X", "verlauf": {"modus": "unfug", "linie": []}}), "Modus ungültig"),
+        (_datei({"name": "X", "posten": "keine Liste"}), "Liste erwartet"),
+    ],
+)
+def test_strecke_import_weist_untaugliche_dateien_ab(client, fabrik, schulen, inhalt, erwartet):
+    """Jede Ablehnung nennt den Grund – und legt nichts an."""
+    a, _ = schulen
+    csrf = angemeldet(client, a.email)
+    antwort = _importieren(client, csrf, inhalt)
+    assert antwort.status_code == 303
+    assert antwort.headers["location"] == "/verwaltung/strecken"
+
+    seite = client.get("/verwaltung/strecken").text
+    assert "Nicht importiert" in seite
+    assert erwartet in seite, seite[:400]
+    with fabrik.intern_kontext() as s:
+        bestand = s.scalars(select(Strecke).where(Strecke.schule_id == a.schule)).all()
+        assert [st.id for st in bestand] == [a.strecke], "keine halbe Strecke zurückgelassen"
+
+
+def test_strecke_import_ohne_datei_meldet_sich(client, schulen):
+    a, _ = schulen
+    csrf = angemeldet(client, a.email)
+    antwort = client.post("/verwaltung/strecken/importieren", data={"csrf": csrf})
+    assert antwort.status_code == 303
+    assert "Bitte eine Datei auswählen" in client.get("/verwaltung/strecken").text
+
+
+def test_streckenliste_bietet_den_import_an(client, schulen):
+    a, _ = schulen
+    angemeldet(client, a.email)
+    html = client.get("/verwaltung/strecken").text
+    assert 'action="/verwaltung/strecken/importieren"' in html
+    assert 'enctype="multipart/form-data"' in html
+    assert 'type="file"' in html
 
 
 # --------------------------------------------------------------------------- Gruppen und Kinder

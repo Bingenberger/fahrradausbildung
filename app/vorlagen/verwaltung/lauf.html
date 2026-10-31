@@ -1,19 +1,36 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld, knopf, mit_rueckfrage with context %}
+{% from "_makros.html" import brotkrume, csrf_feld, knopf, mit_rueckfrage, pdf_knopf with context %}
 {% block titel %}Lauf {{ lauf.datum|datum }}{% endblock %}
 {% block inhalt %}
-<p class="brotkrumen"><a href="/verwaltung/laeufe">Läufe</a> ›</p>
-<h1>{{ lauf.datum|datum_lang }} <span class="status status-{{ lauf.status }}">{{ status_text[lauf.status] }}</span></h1>
-<p>Gruppe <a href="/verwaltung/gruppen/{{ lauf.gruppe.id }}">{{ lauf.gruppe.name }}</a> ({{ aktive_kinder }} aktive Kinder)
-  · Strecke <a href="/verwaltung/strecken/{{ lauf.strecke.id }}">{{ lauf.strecke.name }}</a>
-  · {{ anzahl_ereignisse }} Erfassungen empfangen</p>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    {{ brotkrume("/verwaltung/laeufe", "Läufe") }}
+    <h1>{{ lauf.datum|datum_lang }} <span class="status status-{{ lauf.status }}">{{ status_text[lauf.status] }}</span></h1>
+    <p class="seitenkopf-bei">
+      <span>{{ symbol("users-three") }} <a href="/verwaltung/gruppen/{{ lauf.gruppe.id }}">{{ lauf.gruppe.name }}</a> · {{ aktive_kinder }} aktive Kinder</span>
+      <span>{{ symbol("path") }} <a href="/verwaltung/strecken/{{ lauf.strecke.id }}">{{ lauf.strecke.name }}</a></span>
+      <span>{{ symbol("upload-simple") }} {{ anzahl_ereignisse }} Erfassungen empfangen</span>
+    </p>
+  </div>
+  <div class="aktionsleiste">
+    {% if lauf.status in ("vorbereitet", "laufend") %}
+      {{ pdf_knopf("/verwaltung/laeufe/%d/postenblaetter.pdf"|format(lauf.id), "Posten-Blätter drucken", "knopf knopf-haupt") }}
+    {% endif %}
+    {% if u.gemeldet %}
+      <a class="knopf" href="/verwaltung/laeufe/{{ lauf.id }}/auswertung">{{ symbol("chart-bar") }} Zur Auswertung</a>
+    {% endif %}
+  </div>
+</div>
 
 {% if lauf.daten_geloescht_am %}
-<p class="hinweis">Die Erfassungen dieses Laufs wurden am {{ lauf.daten_geloescht_am|zeit }} nach Ablauf der Aufbewahrungsfrist gelöscht.</p>
+  <p class="hinweis">{{ symbol("info") }}
+    <span>Die Erfassungen dieses Laufs wurden am {{ lauf.daten_geloescht_am|zeit }} nach Ablauf der
+      Aufbewahrungsfrist gelöscht.</span></p>
 {% endif %}
+
 {% if u.fehlt_ueberall or u.fehlt_teilweise %}
 <section class="warnkasten" role="alert" id="fehlende">
-  <h2>Fehlende Startnummern</h2>
+  <h2>{{ symbol("warning") }} Fehlende Startnummern</h2>
   <p>Das heißt meist: Ein Kind fehlt, ein Leibchen wurde vertauscht oder eine Nummer wurde verwechselt.
     Bitte heute noch klären{% if lauf.status in ("vorbereitet", "laufend") %} – oder es fehlt noch ein Upload{% endif %}.</p>
   <ul>
@@ -26,16 +43,17 @@
   </ul>
 </section>
 {% endif %}
+
 {% if u.inaktiv_mit_daten %}
-<p class="hinweis">Erfassungen zu inaktiven Kindern: {% for k in u.inaktiv_mit_daten %}Nr. {{ k.startnummer }}{{ ", " if not loop.last }}{% endfor %}.
-  Sie erscheinen in der Auswertung.</p>
+  <p class="hinweis">{{ symbol("info") }}
+    <span>Erfassungen zu inaktiven Kindern: {% for k in u.inaktiv_mit_daten %}Nr. {{ k.startnummer }}{{ ", " if not loop.last }}{% endfor %}.
+      Sie erscheinen in der Auswertung.</span></p>
 {% endif %}
 
 <section class="karte">
-  <h2>Posten</h2>
+  <h2>{{ symbol("map-pin") }} Posten</h2>
   {% if lauf.status in ("vorbereitet", "laufend") %}
-    <p><a class="knopf knopf-haupt" href="/verwaltung/laeufe/{{ lauf.id }}/postenblaetter.pdf">Posten-Blätter drucken (PDF)</a></p>
-    <p class="hilfe">Ein Blatt je Posten mit QR-Code. Es geht zusammen mit dem iPad an den Posten.
+    <p class="hilfe">{{ symbol("qr-code") }} Ein Blatt je Posten mit QR-Code. Es geht zusammen mit dem iPad an den Posten.
       Wer den QR-Code hat, kann für diesen Posten erfassen – gib die Blätter also nur an die Streckenposten.</p>
   {% endif %}
   <div class="tabelle-rahmen">
@@ -61,7 +79,7 @@
           <td><div class="aktionsleiste">
             {% if e.token and lauf.status == "vorbereitet" %}
               {{ mit_rueckfrage("/verwaltung/laeufe/%d/tokens/%d/erneuern"|format(lauf.id, e.posten.id), "Zugang erneuern",
-                 "Der bisherige QR-Code dieses Postens wird ungültig. Danach das Posten-Blatt neu drucken.") }}
+                 "Der bisherige QR-Code dieses Postens wird ungültig. Danach das Posten-Blatt neu drucken.", sym="arrows-clockwise") }}
             {% endif %}
           </div></td>
         </tr>
@@ -81,7 +99,7 @@
   </div>
   {% if lauf.status in ("vorbereitet", "laufend") %}
     <details class="links">
-      <summary>Links der Posten anzeigen</summary>
+      <summary>{{ symbol("link-simple") }} Links der Posten anzeigen</summary>
       <p class="hilfe">Zum Einrichten ohne QR-Code. Nicht weitergeben – jeder Link ist ein Zugang.</p>
       <ul>
         {% for e in posten if e.url %}<li>{{ e.posten.name }}: <code class="url">{{ e.url }}</code></li>{% endfor %}
@@ -92,10 +110,9 @@
 
 {% if u.gemeldet %}
 <section class="karte">
-  <h2>Durchgänge je Kind und Posten</h2>
+  <h2>{{ symbol("list-bullets") }} Durchgänge je Kind und Posten</h2>
   <p class="hilfe">Anzahl der Vorbeifahrten, die ein Posten erfasst hat. Rot: dieser Posten hat das Kind nicht erfasst.
     Sehr unterschiedliche Zahlen in einer Zeile können auf eine verwechselte Nummer hindeuten.</p>
-  <p><a class="knopf knopf-haupt" href="/verwaltung/laeufe/{{ lauf.id }}/auswertung">Zur Auswertung</a></p>
   <div class="tabelle-rahmen">
   <table class="tabelle matrix">
     <thead><tr><th>Nr.</th>{% for e in posten %}<th class="zahl" title="{{ e.posten.name }}">{{ loop.index }}. {{ e.posten.name }}</th>{% endfor %}</tr></thead>
@@ -122,26 +139,26 @@
 {% endif %}
 
 <section class="karte">
-  <h2>Lauf</h2>
+  <h2>{{ symbol("flag-checkered") }} Lauf</h2>
+  {% if lauf.status == "abgeschlossen" and wieder_oeffnenbar %}
+    <p class="hilfe">Falls ein iPad seine Daten noch nicht übertragen hat: Lauf wieder öffnen, übertragen, erneut abschließen.</p>
+  {% endif %}
   <div class="aktionsleiste">
     {% if lauf.status in ("vorbereitet", "laufend") %}
       {% set warnung = "Achtung: Von diesen Posten liegt noch kein Upload vor: " ~ ohne_upload|join(", ") ~ ". " if ohne_upload else "" %}
       {{ mit_rueckfrage("/verwaltung/laeufe/%d/abschliessen"|format(lauf.id), "Lauf abschließen",
-         warnung ~ "Danach können die iPads nichts mehr übertragen. Alle Zugänge werden entwertet.") }}
+         warnung ~ "Danach können die iPads nichts mehr übertragen. Alle Zugänge werden entwertet.", sym="check-circle") }}
     {% endif %}
     {% if wieder_oeffnenbar %}
-      {{ knopf("/verwaltung/laeufe/%d/wieder-oeffnen"|format(lauf.id), "Wieder öffnen") }}
+      {{ knopf("/verwaltung/laeufe/%d/wieder-oeffnen"|format(lauf.id), "Wieder öffnen", sym="lock-open") }}
     {% endif %}
     {% if lauf.status == "abgeschlossen" %}
-      {{ knopf("/verwaltung/laeufe/%d/archivieren"|format(lauf.id), "Archivieren") }}
+      {{ knopf("/verwaltung/laeufe/%d/archivieren"|format(lauf.id), "Archivieren", sym="archive") }}
     {% endif %}
     {% if lauf.status == "vorbereitet" and not anzahl_ereignisse %}
       {{ mit_rueckfrage("/verwaltung/laeufe/%d/loeschen"|format(lauf.id), "Löschen",
          "Der Lauf und alle Zugänge werden gelöscht. Gedruckte Posten-Blätter werden ungültig.") }}
     {% endif %}
   </div>
-  {% if lauf.status == "abgeschlossen" and wieder_oeffnenbar %}
-    <p class="hilfe">Falls ein iPad seine Daten noch nicht übertragen hat: Lauf wieder öffnen, übertragen, erneut abschließen.</p>
-  {% endif %}
 </section>
 {% endblock %}

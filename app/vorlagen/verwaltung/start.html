@@ -1,52 +1,97 @@
 {% extends "basis.html" %}
+{% from "_makros.html" import leerzustand with context %}
 {% block titel %}Übersicht{% endblock %}
 {% block inhalt %}
-<h1>{{ sitzung.schule_name }}</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <h1>{{ sitzung.schule_name }}</h1>
+    <p class="seitenkopf-bei"><span>{{ symbol("user-circle") }} {{ sitzung.email }}</span></p>
+  </div>
+  <div class="aktionsleiste">
+    <a class="knopf knopf-haupt" href="/verwaltung/laeufe">{{ symbol("plus") }} Lauf anlegen</a>
+  </div>
+</div>
 
 <section class="karte">
-  <h2>Anstehende Läufe</h2>
+  <div class="karte-kopf">
+    <h2>{{ symbol("flag-checkered") }} Anstehende Läufe</h2>
+    <a class="knopf knopf-leise knopf-klein" href="/verwaltung/laeufe">Alle Läufe {{ symbol("caret-right") }}</a>
+  </div>
   {% if laeufe %}
-    <ul class="liste">
+    <ul class="sprungliste">
       {% for l in laeufe %}
-        <li><a href="/verwaltung/laeufe/{{ l.id }}">{{ l.datum|datum_lang }}</a>
-          <span class="hilfe">{{ l.gruppe.name }} · {{ l.strecke.name }}</span></li>
+        <li>
+          <a href="/verwaltung/laeufe/{{ l.id }}">
+            {{ symbol("calendar-dots") }}
+            <span class="sprungliste-text">
+              <strong>{{ l.datum|datum_lang }}</strong>
+              <span class="hilfe">{{ l.gruppe.name }} · {{ l.strecke.name }}</span>
+            </span>
+            <span class="weiter">{{ symbol("caret-right") }}</span>
+          </a>
+        </li>
       {% endfor %}
     </ul>
   {% else %}
-    <p>Kein Lauf geplant.</p>
+    {% call leerzustand("calendar-dots", "Kein Lauf geplant. Ein Lauf verbindet eine Gruppe mit einer Strecke an einem Datum – daraus entstehen die Posten-Blätter mit den QR-Codes.") %}
+      <a class="knopf knopf-haupt" href="/verwaltung/laeufe">{{ symbol("plus") }} Lauf anlegen</a>
+    {% endcall %}
   {% endif %}
-  <p><a href="/verwaltung/laeufe">Alle Läufe</a></p>
 </section>
 
 <div class="spalten">
   <section class="karte">
-    <h2>Strecken</h2>
+    <div class="karte-kopf">
+      <h2>{{ symbol("path") }} Strecken</h2>
+      <a class="knopf knopf-leise knopf-klein" href="/verwaltung/strecken">Alle {{ symbol("caret-right") }}</a>
+    </div>
     {% if strecken %}
-      <ul class="liste">
+      <ul class="sprungliste">
         {% for s in strecken %}
-          <li><a href="/verwaltung/strecken/{{ s.id }}">{{ s.name }}</a>
-            <span class="hilfe">{{ s.posten|length }} Posten</span></li>
+          <li>
+            <a href="/verwaltung/strecken/{{ s.id }}">
+              {{ symbol("path") }}
+              <span class="sprungliste-text">
+                <strong>{{ s.name }}</strong>
+                <span class="hilfe">{{ s.posten|length }} Posten</span>
+              </span>
+              <span class="weiter">{{ symbol("caret-right") }}</span>
+            </a>
+          </li>
         {% endfor %}
       </ul>
     {% else %}
-      <p>Noch keine Strecke angelegt.</p>
+      {% call leerzustand("path", "Noch keine Strecke angelegt. Eine Strecke beschreibt den Weg mit seinen Posten.") %}
+        <a class="knopf" href="/verwaltung/strecken">{{ symbol("plus") }} Strecke anlegen</a>
+      {% endcall %}
     {% endif %}
-    <p><a href="/verwaltung/strecken">Alle Strecken verwalten</a></p>
   </section>
 
   <section class="karte">
-    <h2>Gruppen</h2>
+    <div class="karte-kopf">
+      <h2>{{ symbol("users-three") }} Gruppen</h2>
+      <a class="knopf knopf-leise knopf-klein" href="/verwaltung/gruppen">Alle {{ symbol("caret-right") }}</a>
+    </div>
     {% if gruppen %}
-      <ul class="liste">
+      <ul class="sprungliste">
         {% for g in gruppen %}
-          <li><a href="/verwaltung/gruppen/{{ g.id }}">{{ g.name }}</a>
-            <span class="hilfe">{{ g.schuljahr }} · {{ anzahl.get(g.id, 0) }} Kinder</span></li>
+          <li>
+            <a href="/verwaltung/gruppen/{{ g.id }}">
+              {{ symbol("users-three") }}
+              <span class="sprungliste-text">
+                <strong>{{ g.name }}</strong>
+                <span class="hilfe">{{ g.schuljahr }} · {{ anzahl.get(g.id, 0) }} Kinder</span>
+              </span>
+              <span class="weiter">{{ symbol("caret-right") }}</span>
+            </a>
+          </li>
         {% endfor %}
       </ul>
     {% else %}
-      <p>Noch keine Gruppe angelegt.</p>
+      {% call leerzustand("users-three", "Noch keine Gruppe angelegt. Eine Gruppe ist eine Klasse mit ihren Startnummern – Namen speichert die Anwendung nicht.") %}
+        <a class="knopf" href="/verwaltung/gruppen">{{ symbol("plus") }} Gruppe anlegen</a>
+      {% endcall %}
     {% endif %}
-    <p><a href="/verwaltung/gruppen">Alle Gruppen verwalten</a></p>
   </section>
 </div>
 {% endblock %}

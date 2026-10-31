@@ -1,36 +1,64 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld with context %}
+{% from "_makros.html" import csrf_feld, leerzustand with context %}
 {% block titel %}Strecken{% endblock %}
 {% block inhalt %}
-<h1>Strecken</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <h1>Strecken</h1>
+    <p class="seitenkopf-bei"><span>{{ symbol("path") }} Der Weg mit seinen Posten – Grundlage jedes Laufs</span></p>
+  </div>
+  <div class="aktionsleiste">
+    <a class="knopf knopf-haupt" href="#neu">{{ symbol("plus") }} Neue Strecke</a>
+  </div>
+</div>
 
 <section class="karte">
   {% if strecken %}
-    <table class="tabelle">
-      <thead><tr><th>Name</th><th>Posten</th><th>Status</th></tr></thead>
-      <tbody>
-        {% for s in strecken %}
-          <tr {% if s.archiviert %}class="archiviert"{% endif %}>
-            <td><a href="/verwaltung/strecken/{{ s.id }}">{{ s.name }}</a></td>
-            <td>{{ s.posten|length }}</td>
-            <td>{{ "archiviert" if s.archiviert else "aktiv" }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="tabelle-rahmen">
+      <table class="tabelle">
+        <thead><tr><th>Name</th><th class="zahl">Posten</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for s in strecken %}
+            <tr {% if s.archiviert %}class="archiviert"{% endif %}>
+              <td><a href="/verwaltung/strecken/{{ s.id }}">{{ s.name }}</a></td>
+              <td class="zahl">{{ s.posten|length }}</td>
+              <td>
+                {% if s.archiviert %}
+                  <span class="marke-archiv">{{ symbol("archive") }} archiviert</span>
+                {% else %}
+                  <span class="status status-laufend">{{ symbol("check") }} aktiv</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p>Noch keine Strecke angelegt.</p>
+    {{ leerzustand("path", "Noch keine Strecke angelegt. Lege sie unten an, füge ihre Posten hinzu und zeichne sie anschließend auf der Karte ein.") }}
   {% endif %}
 </section>
 
-<section class="karte">
-  <h2>Neue Strecke</h2>
+<section class="karte" id="neu">
+  <h2>{{ symbol("plus") }} Neue Strecke</h2>
   <form method="post" action="/verwaltung/strecken/neu" class="formular">
     {{ csrf_feld() }}
     <label>Name <input type="text" name="name" maxlength="200" required placeholder="z. B. Runde um die Schule"></label>
     <label>Beschreibung <span class="hilfe">freiwillig</span>
       <textarea name="beschreibung" rows="2"></textarea></label>
-    <button type="submit" class="knopf knopf-haupt">Strecke anlegen</button>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("plus") }} Strecke anlegen</button>
+  </form>
+</section>
+
+<section class="karte" id="importieren">
+  <h2>{{ symbol("upload-simple") }} Strecke importieren</h2>
+  <form method="post" action="/verwaltung/strecken/importieren" class="formular" enctype="multipart/form-data">
+    {{ csrf_feld() }}
+    <label>Datei <span class="hilfe">eine mit „Strecke exportieren“ gesicherte JSON-Datei, auch die einer anderen Schule</span>
+      <input type="file" name="datei" accept=".json,application/json" required></label>
+    <p class="hilfe">Es entsteht immer eine neue Strecke mit allen Posten und Items; vorhandene Strecken
+      bleiben unberührt. Der Verlauf auf der Karte kommt mit, sofern die Datei einen enthält.</p>
+    <button type="submit" class="knopf">{{ symbol("upload-simple") }} Strecke importieren</button>
   </form>
 </section>
 {% endblock %}

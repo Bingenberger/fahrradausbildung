@@ -18,6 +18,7 @@ import {
 import { offlineEinrichten } from "./offline.js";
 import * as speicher from "./speicher.js";
 import * as verbindung from "./verbindung.js";
+import * as wach from "./wachbleiben.js";
 
 const RUECKGAENGIG_MS = 10_000;
 // Schutz gegen Doppeltipp auf „Weiter": Kinder kommen alle 20–30 s, nie in 0,7 s.
@@ -197,6 +198,7 @@ async function offlineVorbereiten() {
 // Nie vorher – solange der Lauf läuft, sind die lokalen Daten die einzige Kopie.
 async function abschliessen() {
   await speicher.allesLoeschen();
+  await wach.loslassen();
   zeige("fertig");
 }
 
@@ -242,6 +244,11 @@ function einrichtungZeigen() {
     ? `${k.startnummern.length} Startnummern · Übungsmodus`
     : `${k.startnummern.length} Startnummern geladen`;
   $("anleitung-installieren").hidden = istInstalliert();
+  $("einrichtung-wach").textContent = wach.unterstuetzt()
+    ? "Das Display bleibt während der Prüfung an."
+    : "Dieses iPad kann das Display nicht von selbst anlassen. Bitte unter "
+      + "Einstellungen → Anzeige & Helligkeit → Automatische Sperre „Nie“ wählen.";
+  $("einrichtung-wach").className = wach.unterstuetzt() ? "status-ok" : "status-offline warnung";
   $("prototyp-hinweis").hidden = !zustand.demo;
   const liste = $("einrichtung-items");
   liste.replaceChildren(...k.items.map((i) => element("li", "", i.kurzbezeichnung)));
@@ -258,6 +265,8 @@ function hauptZeigen() {
   erfassungZeichnen();
   statusZeichnen();
   zeige("haupt");
+  // Nicht abwarten: die Erfassung darf darauf nicht warten müssen.
+  wach.halten().then(statusZeichnen);
 }
 
 async function statusZeichnen() {
@@ -268,9 +277,15 @@ async function statusZeichnen() {
   if (zustand.demo) text = `${zustand.ereignisse.length} Erfassungen · Übungsmodus`;
   if (abgewiesen) text += ` · ${abgewiesen} abgewiesen`;
   if (zustand.zugangUngueltig && n > 0) text += " · Zugang ungültig, Lehrkraft fragen";
+  // Energiesparmodus o. Ä.: Die Aufsicht soll nicht glauben, das Display bleibe an.
+  const displaySperrt = wach.unterstuetzt() && wach.versucht() && !wach.aktiv();
+  if (displaySperrt) text += " · Display sperrt sich";
   const zaehler = $("status-zaehler");
   zaehler.textContent = text;
-  zaehler.classList.toggle("warnung", Boolean(abgewiesen || (zustand.zugangUngueltig && n > 0)));
+  zaehler.classList.toggle(
+    "warnung",
+    Boolean(abgewiesen || (zustand.zugangUngueltig && n > 0) || displaySperrt),
+  );
   const online = navigator.onLine;
   const netz = $("status-netz");
   netz.textContent = online ? "online" : "offline";

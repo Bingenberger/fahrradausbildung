@@ -1,11 +1,43 @@
 {% extends "basis.html" %}
-{% from "_makros.html" import csrf_feld with context %}
+{% from "_makros.html" import csrf_feld, leerzustand with context %}
 {% block titel %}Läufe{% endblock %}
 {% block inhalt %}
-<h1>Läufe</h1>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <h1>Läufe</h1>
+    <p class="seitenkopf-bei"><span>{{ symbol("flag-checkered") }} Eine Gruppe fährt eine Strecke an einem Tag</span></p>
+  </div>
+  {% if strecken and gruppen %}
+    <div class="aktionsleiste">
+      <a class="knopf knopf-haupt" href="#neu">{{ symbol("plus") }} Neuer Lauf</a>
+    </div>
+  {% endif %}
+</div>
 
 <section class="karte">
-  <h2>Neuer Lauf</h2>
+  {% if laeufe %}
+    <div class="tabelle-rahmen">
+      <table class="tabelle">
+        <thead><tr><th>Datum</th><th>Gruppe</th><th>Strecke</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for l in laeufe %}
+            <tr {% if l.status == "archiviert" %}class="archiviert"{% endif %}>
+              <td><a href="/verwaltung/laeufe/{{ l.id }}">{{ l.datum|datum }}</a></td>
+              <td>{{ l.gruppe.name }}</td>
+              <td>{{ l.strecke.name }}</td>
+              <td><span class="status status-{{ l.status }}">{{ status_text[l.status] }}</span></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {{ leerzustand("flag-checkered", "Noch kein Lauf angelegt. Beim Anlegen entsteht für jeden Posten der Strecke ein eigener Zugang – den bekommt die Aufsicht als QR-Code auf dem Posten-Blatt.") }}
+  {% endif %}
+</section>
+
+<section class="karte" id="neu">
+  <h2>{{ symbol("plus") }} Neuer Lauf</h2>
   {% if strecken and gruppen %}
     <form method="post" action="/verwaltung/laeufe/neu" class="formular formular-reihe">
       {{ csrf_feld() }}
@@ -20,31 +52,13 @@
         </select>
       </label>
       <label>Datum <input type="date" name="datum" min="{{ heute }}" required></label>
-      <button type="submit" class="knopf knopf-haupt">Lauf anlegen</button>
+      <button type="submit" class="knopf knopf-haupt">{{ symbol("plus") }} Lauf anlegen</button>
     </form>
     <p class="hilfe">Für jeden Posten der Strecke entsteht ein eigener Zugang (QR-Code auf dem Posten-Blatt).</p>
   {% else %}
-    <p>Lege zuerst eine <a href="/verwaltung/strecken">Strecke</a> und eine <a href="/verwaltung/gruppen">Gruppe</a> an.</p>
-  {% endif %}
-</section>
-
-<section class="karte">
-  {% if laeufe %}
-    <table class="tabelle">
-      <thead><tr><th>Datum</th><th>Gruppe</th><th>Strecke</th><th>Status</th></tr></thead>
-      <tbody>
-        {% for l in laeufe %}
-          <tr {% if l.status == "archiviert" %}class="archiviert"{% endif %}>
-            <td><a href="/verwaltung/laeufe/{{ l.id }}">{{ l.datum|datum }}</a></td>
-            <td>{{ l.gruppe.name }}</td>
-            <td>{{ l.strecke.name }}</td>
-            <td><span class="status status-{{ l.status }}">{{ status_text[l.status] }}</span></td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>Noch kein Lauf angelegt.</p>
+    <p class="hinweis">{{ symbol("info") }}
+      <span>Dafür fehlt noch etwas: Lege zuerst eine <a href="/verwaltung/strecken">Strecke</a>
+        und eine <a href="/verwaltung/gruppen">Gruppe</a> an.</span></p>
   {% endif %}
 </section>
 {% endblock %}

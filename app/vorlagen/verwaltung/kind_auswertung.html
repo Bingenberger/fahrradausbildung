@@ -1,21 +1,31 @@
 {% extends "basis.html" %}
+{% from "_makros.html" import pdf_knopf with context %}
 {% block titel %}Nr. {{ z.kind.startnummer }} – Auswertung{% endblock %}
 {% block inhalt %}
-<p class="brotkrumen"><a href="/verwaltung/laeufe">Läufe</a> › <a href="/verwaltung/laeufe/{{ lauf.id }}">{{ lauf.datum|datum_lang }}</a> ›
-  <a href="/verwaltung/laeufe/{{ lauf.id }}/auswertung">Auswertung</a> ›</p>
-<h1>Nr. {{ z.kind.startnummer }}
-  {% if not z.kind.aktiv %}<span class="leise">(inaktiv)</span>{% endif %}</h1>
-<p class="aktionsleiste">
-  {% if vorher %}<a href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ vorher.id }}">‹ Nr. {{ vorher.startnummer }}</a>{% endif %}
-  {% if nachher %}<a href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ nachher.id }}">Nr. {{ nachher.startnummer }} ›</a>{% endif %}
-</p>
+<div class="seitenkopf">
+  <div class="seitenkopf-text">
+    <p class="brotkrumen">
+      <a href="/verwaltung/laeufe">Läufe</a> {{ symbol("caret-right") }}
+      <a href="/verwaltung/laeufe/{{ lauf.id }}">{{ lauf.datum|datum_lang }}</a> {{ symbol("caret-right") }}
+      <a href="/verwaltung/laeufe/{{ lauf.id }}/auswertung">Auswertung</a> {{ symbol("caret-right") }}
+    </p>
+    <h1>Nr. {{ z.kind.startnummer }}
+      {% if not z.kind.aktiv %}<span class="marke-archiv">inaktiv</span>{% endif %}</h1>
+    <p class="seitenkopf-bei">
+      {% if vorher %}<a href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ vorher.id }}">{{ symbol("arrow-up") }} Nr. {{ vorher.startnummer }}</a>{% endif %}
+      {% if nachher %}<a href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ nachher.id }}">{{ symbol("arrow-down") }} Nr. {{ nachher.startnummer }}</a>{% endif %}
+    </p>
+  </div>
+  <div class="aktionsleiste">
+    {{ pdf_knopf("/verwaltung/laeufe/%d/kinder/%d/feedbackbogen.pdf"|format(lauf.id, z.kind.id), "Feedbackbogen (PDF)") }}
+  </div>
+</div>
 {% set e = z.ergebnis %}
-<p><a class="knopf knopf-haupt" href="/verwaltung/laeufe/{{ lauf.id }}/kinder/{{ z.kind.id }}/feedbackbogen.pdf">Feedbackbogen (PDF)</a></p>
 
 <section class="karte">
-  <h2>Fahrsicherheit</h2>
-  {% if e.stark_abweichend %}<p><span class="marke-abweichung">Die Posten schätzen das Kind sehr unterschiedlich ein.</span></p>{% endif %}
-  <table class="tabelle">
+  <h2>{{ symbol("check-circle") }} Fahrsicherheit</h2>
+  {% if e.stark_abweichend %}<p><span class="marke-abweichung">{{ symbol("warning") }} Die Posten schätzen das Kind sehr unterschiedlich ein.</span></p>{% endif %}
+  <div class="tabelle-rahmen"><table class="tabelle">
     <thead><tr><th>Posten</th><th>Einschätzung</th><th>Bemerkung</th></tr></thead>
     <tbody>
       {% for p in posten %}
@@ -27,18 +37,18 @@
         </tr>
       {% endfor %}
     </tbody>
-  </table>
+  </table></div>
 </section>
 
 {% for p in posten %}
   {% set pe = e.posten[p.id] %}
   <section class="karte">
-    <h2>{{ loop.index }}. {{ p.name }}</h2>
+    <h2>{{ symbol("map-pin") }} {{ loop.index }}. {{ p.name }}</h2>
     {% if not pe.durchgaenge %}
       <p class="fehlt-text">Keine Durchgänge erfasst.</p>
     {% else %}
       <p>{{ pe.durchgaenge }} {{ "Durchgang" if pe.durchgaenge == 1 else "Durchgänge" }}</p>
-      <table class="tabelle">
+      <div class="tabelle-rahmen"><table class="tabelle">
         <thead><tr><th>Punkt</th><th class="zahl">vergessen</th><th><span class="unsichtbar">Anteil</span></th></tr></thead>
         <tbody>
           {% for i in p.items %}
@@ -50,7 +60,7 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+      </table></div>
     {% endif %}
   </section>
 {% endfor %}
