@@ -1,53 +1,62 @@
-# Fahrradprüfung – Betrieb mit Docker Compose.
-#
-#   cp .env.example .env      # Werte anpassen, vor allem POSTGRES_PASSWORD und FP_OEFFENTLICHE_URL
-#   docker compose up -d --build
-#   docker compose exec app python -m app.kommandos systemadmin-anlegen admin@example.org
-#
-# Die App lauscht nur auf 127.0.0.1 – davor gehört nginx mit HTTPS
-# (Beispiel: deploy/nginx-fahrradpruefung.conf). Details: DEPLOYMENT.md.
-
 services:
   db:
-    image: postgres:16-alpine
-    restart: unless-stopped
+    image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+    restart: "no"
     environment:
-      POSTGRES_DB: fahrrad
-      POSTGRES_USER: fahrrad
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env}
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/db-admin
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/init-postgres.sh:/docker-entrypoint-initdb.d/01-fahrrad.sh:ro
+      - ${FP_SECRETS_DIR:?private credentials directory required}/db-admin:/run/secrets/db-admin:ro
+      - ${FP_SECRETS_DIR}/db-app:/run/secrets/db-app:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fahrrad -d fahrrad"]
+      test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U postgres -d fahrrad]
       interval: 5s
-      timeout: 5s
+      timeout: 4s
       retries: 20
-
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging: &logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
   app:
-    build: .
-    image: fahrradpruefung:latest
-    restart: unless-stopped
-    env_file: .env
+    build: {context: ., target: runtime}
+    image: fahrradausbildung:0.1.0-dev
+    restart: "no"
+    init: true
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:size=128m,mode=1777"]
+    mem_limit: 768m
+    cpus: 1
+    pids_limit: 128
+    stop_grace_period: 60s
     environment:
-      # Überschreibt den Wert aus .env: Im Compose-Netz heißt die Datenbank „db".
-      FP_DATABASE_URL: postgresql+psycopg://fahrrad:${POSTGRES_PASSWORD}@db:5432/fahrrad
+      FP_DATABASE_URL_FILE: /run/secrets/database-url
       FP_VORLAGEN_VERZEICHNIS: /vorlagen
-      # X-Forwarded-For nur von nginx glauben. „*" ist unbedenklich, solange der Port
-      # auf 127.0.0.1 liegt – dort kommt niemand von außen hin. Wird FP_BIND geöffnet,
-      # MUSS hier die Adresse des Proxys stehen (FP_PROXY_IPS), sonst kann jeder, der
-      # den Port erreicht, mit erfundenem X-Forwarded-For die Anmeldebremse umgehen.
-      FORWARDED_ALLOW_IPS: "${FP_PROXY_IPS:-*}"
+      FP_PROXY_IPS: ${FP_PROXY_IPS:-127.0.0.1}
+      FP_OEFFENTLICHE_URL: ${FP_OEFFENTLICHE_URL:-http://localhost:8000}
+      FP_COOKIE_SECURE: ${FP_COOKIE_SECURE:-true}
+      FP_KARTEN_KACHELN: ${FP_KARTEN_KACHELN:-}
+      FP_TOKEN_GUELTIGKEIT_STUNDEN: ${FP_TOKEN_GUELTIGKEIT_STUNDEN:-24}
+      FP_AUFBEWAHRUNG_MONATE: ${FP_AUFBEWAHRUNG_MONATE:-12}
+      FP_ZEITZONE: ${FP_ZEITZONE:-Europe/Berlin}
+      FP_SITZUNG_LEERLAUF_MINUTEN: ${FP_SITZUNG_LEERLAUF_MINUTEN:-120}
+      FP_SITZUNG_MAX_STUNDEN: ${FP_SITZUNG_MAX_STUNDEN:-12}
+      FP_ANMELDUNG_MAX_FEHLVERSUCHE: ${FP_ANMELDUNG_MAX_FEHLVERSUCHE:-10}
     depends_on:
-      db:
-        condition: service_healthy
+      db: {condition: service_healthy}
     ports:
-      # Vorgabe: nur über 127.0.0.1 erreichbar, für nginx auf demselben Host. Sitzt der
-      # Proxy auf einem anderen Rechner (z. B. über VPN), FP_BIND in der .env auf die
-      # Adresse setzen, über die er die App erreicht – und FP_PROXY_IPS mitsetzen.
       - "${FP_BIND:-127.0.0.1}:${FP_PORT:-8000}:8000"
     volumes:
-      # Eigene Feedbackbogen-Vorlagen und Logos je Schule (README: „Feedbackbogen anpassen").
-      - ./vorlagen:/vorlagen:ro
-
+      - vorlagen:/vorlagen:ro
+      - ${FP_SECRETS_DIR}/database-url:/run/secrets/database-url:ro
+    logging: *logging
 volumes:
   pgdata:
+  vorlagen:

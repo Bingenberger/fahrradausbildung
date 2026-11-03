@@ -102,16 +102,11 @@ Posten-Blatt; Kinder werden weiterhin nicht verortet, und die Posten-App zeigt k
 
 ## Betrieb
 
-Docker Compose (App + PostgreSQL 16, benanntes Volume `pgdata`) hinter nginx mit HTTPS:
+Eigenständiges Docker Compose mit PostgreSQL 16, privaten Credentialdateien
+und expliziter Migration. Kein Standardkonto; persönliche lokale Administration.
 
-```bash
-cp .env.example .env              # POSTGRES_PASSWORD, FP_OEFFENTLICHE_URL setzen
-docker compose up -d --build
-docker compose exec app python -m app.kommandos systemadmin-anlegen admin@example.org
-```
-
-Alles Weitere – nginx-Konfiguration, cron-Aufgaben, Sicherung, Aktualisierung,
-Fehlersuche – steht in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Installation, Limits, Offline-/Domainwechsel und Sicherung:
+[PLATFORM.md](PLATFORM.md), Proxyhinweise: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Projektaufbau
 

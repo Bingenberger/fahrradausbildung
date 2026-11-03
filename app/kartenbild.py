@@ -64,14 +64,18 @@ def _kachel_holen(url: str) -> bytes:
         url, headers={"User-Agent": f"Fahrradpruefung/1.0 (+{einstellungen().oeffentliche_url})"}
     )
     with urllib.request.urlopen(anfrage, timeout=6) as antwort:
-        return antwort.read()
+        data=antwort.read(2*1024*1024+1)
+        if len(data)>2*1024*1024:raise ValueError("Tile byte limit")
+        return data
 
 
 def _laden(url: str, z: int) -> Image.Image | None:
     """Kachel holen, bei vorübergehenden Serverfehlern erneut versuchen."""
     for versuch in range(1, VERSUCHE + 1):
         try:
-            return Image.open(io.BytesIO(_kachel_holen(url))).convert("RGB")
+            image=Image.open(io.BytesIO(_kachel_holen(url)))
+            if image.width*image.height>4_000_000:raise ValueError("Tile pixel limit")
+            return image.convert("RGB")
         except urllib.error.HTTPError as fehler:
             if fehler.code not in VORUEBERGEHEND or versuch == VERSUCHE:
                 log.warning("Kartenkachel nicht geladen (z=%s): HTTP %s", z, fehler.code)

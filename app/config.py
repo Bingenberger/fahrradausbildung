@@ -1,6 +1,10 @@
 """Zentrale Konfiguration, ausschließlich aus Umgebungsvariablen."""
 
 from functools import lru_cache
+from pathlib import Path
+import os
+from urllib.parse import urlsplit
+from pydantic import model_validator
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -9,6 +13,22 @@ class Einstellungen(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="FP_", extra="ignore")
 
     database_url: str = "postgresql+psycopg://fahrrad:fahrrad@localhost:55432/fahrrad"
+    database_url_file: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def private_url(cls, values):
+        values=dict(values)
+        file=values.get("database_url_file") or os.environ.get("FP_DATABASE_URL_FILE")
+        if file:
+            if os.environ.get("FP_DATABASE_URL") or values.get("database_url"):
+                raise ValueError("Configure one database credential source")
+            values["database_url"]=Path(file).read_text().strip()
+        origin=urlsplit(values.get("oeffentliche_url",os.environ.get("FP_OEFFENTLICHE_URL","http://localhost:8000")))
+        if origin.scheme not in ("http","https") or not origin.netloc or origin.username or origin.password or origin.path not in ("","/") or origin.query or origin.fragment:
+            raise ValueError("Public URL must be an HTTP(S) origin")
+        return values
+
     # Gültigkeit der Posten-Tokens nach dem Laufdatum (Spezifikation 9: 24 Stunden).
     token_gueltigkeit_stunden: int = 24
     # Aufbewahrungsfrist der Ereignisdaten in Monaten (Spezifikation 9: Standard 12).

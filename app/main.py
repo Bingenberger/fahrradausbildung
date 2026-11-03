@@ -12,7 +12,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from sqlalchemy import select, text
+from app.betrieb import BodyLimit
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import protokoll, system, verwaltung
@@ -44,6 +45,7 @@ def erstelle_app(fabrik: Sitzungsfabrik | None = None) -> FastAPI:
 
     # Verwaltungsseiten enthalten Auswertungen: nie zwischenspeichern.
     # (Die Posten-App setzt eigene Cache-Header; Offline übernimmt der Service Worker.)
+    app.add_middleware(BodyLimit)
     app.add_middleware(Sicherheitsheader, cache="no-store")
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     app.mount("/p/assets", StaticFiles(directory=posten_seiten.POSTEN_APP), name="posten_assets")
@@ -53,16 +55,27 @@ def erstelle_app(fabrik: Sitzungsfabrik | None = None) -> FastAPI:
     app.include_router(verwaltung.router)
     app.include_router(system.router)
 
-    @app.get("/gesund", include_in_schema=False)
-    def gesund():
-        """Für Docker-Healthcheck und Monitoring: Anwendung läuft und erreicht die Datenbank."""
-        try:
-            with fabrik.intern_kontext() as s:
-                s.execute(select(Schule.id).limit(1))
-        except SQLAlchemyError:
-            log.exception("Gesundheitsprüfung: Datenbank nicht erreichbar")
-            return JSONResponse({"ok": False}, status_code=503)
+    @app.get("/health/live", include_in_schema=False)
+    def live():
         return {"ok": True}
+
+    @app.get("/gesund", include_in_schema=False)
+    @app.get("/health/ready", include_in_schema=False)
+    def gesund():
+        try:
+            with fabrik.intern_kontext() as session:
+                revision=session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
+                if revision!=["0008"]:
+                    return JSONResponse({"ok":False},status_code=503)
+                session.execute(select(Schule.id).limit(1))
+        except SQLAlchemyError:
+            return JSONResponse({"ok":False},status_code=503)
+        return {"ok":True}
+
+    @app.exception_handler(SQLAlchemyError)
+    async def unavailable(request,exc):
+        log.error("Database operation unavailable")
+        return JSONResponse({"fehler":"Dienst derzeit nicht verfügbar"},status_code=503)
 
     @app.exception_handler(NichtAngemeldet)
     async def _nicht_angemeldet(request: Request, exc: NichtAngemeldet):

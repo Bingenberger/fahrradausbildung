@@ -22,11 +22,16 @@ from app.web.sitzung import MIN_PASSWORTLAENGE, abgelaufene_sitzungen_loeschen
 
 
 def systemadmin_anlegen(email: str) -> int:
-    passwort = getpass.getpass("Passwort: ")
+    try:
+        tty=open("/dev/tty","r+")
+    except OSError:
+        print("Lokales kontrollierendes Terminal erforderlich.",file=sys.stderr)
+        return 1
+    passwort = getpass.getpass("Passwort: ",stream=tty)
     if len(passwort) < MIN_PASSWORTLAENGE:
         print(f"Das Passwort muss mindestens {MIN_PASSWORTLAENGE} Zeichen lang sein.", file=sys.stderr)
         return 1
-    if getpass.getpass("Passwort wiederholen: ") != passwort:
+    if getpass.getpass("Passwort wiederholen: ",stream=tty) != passwort:
         print("Die Passwörter stimmen nicht überein.", file=sys.stderr)
         return 1
     with sitzungen().intern_kontext() as s:

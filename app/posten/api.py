@@ -29,6 +29,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.mandant import FPSession
+from app.betrieb import PostenBremse
 from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, PostenToken
 from app.token import token_gueltig
 
@@ -79,7 +80,7 @@ class Bremse:
 
 def _bremse(request: Request) -> Bremse:
     if not hasattr(request.app.state, "posten_bremse"):
-        request.app.state.posten_bremse = Bremse()
+        request.app.state.posten_bremse = PostenBremse(request.app.state.fabrik)
     return request.app.state.posten_bremse
 
 

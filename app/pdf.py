@@ -18,6 +18,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import CSS, HTML
 
 from app.config import einstellungen
+from app.betrieb import begrenzter_export
+from fastapi import HTTPException
 from app.kartenbild import ZOOM_POSTEN, ausschnitt, kartenbild, laenge_meter
 from app.formate import datum_kurz, datum_lang, laenge_text
 from app.modelle import Gruppe, Kind, Lauf, Schule, Strecke
@@ -80,6 +82,7 @@ def _rendern(vorlage: str, stylesheet: str, **kontext) -> bytes:
     )
 
 
+@begrenzter_export
 def feedbackboegen_pdf(schule: Schule, lauf: Lauf, boegen: list[dict]) -> bytes:
     """Feedbackbögen, je Eintrag in ``boegen`` ({"kind", "feedback"}) ein Bogen.
 
@@ -89,6 +92,7 @@ def feedbackboegen_pdf(schule: Schule, lauf: Lauf, boegen: list[dict]) -> bytes:
     Vorlage, Stylesheet und Logo kommen aus dem Schulordner, dem gemeinsamen
     Ordner oder – falls dort nichts liegt – aus ``app/vorlagen/pdf/``.
     """
+    if len(boegen)>200:raise HTTPException(413,"Höchstens 200 Feedbackbögen je Export")
     pfade = suchpfade(schule)
     vorlage = _umgebung(pfade).get_template("feedbackbogen.html")
     css = _erste_datei(pfade, ["feedbackbogen.css"])
@@ -100,8 +104,10 @@ def feedbackboegen_pdf(schule: Schule, lauf: Lauf, boegen: list[dict]) -> bytes:
     )
 
 
+@begrenzter_export
 def namensliste_pdf(schule: Schule, gruppe: Gruppe, kinder: Sequence[Kind]) -> bytes:
     """Startnummern der Gruppe mit leeren Zeilen – die Namen kommen von Hand dazu."""
+    if len(kinder)>2000:raise HTTPException(413,"Namensliste zu groß")
     return _rendern("namensliste.html", "namensliste.css", schule=schule, gruppe=gruppe, kinder=kinder)
 
 
@@ -126,8 +132,10 @@ def _standort_karte(lauf: Lauf, nummer: int) -> str | None:
     return _bild_uri(png)
 
 
+@begrenzter_export
 def postenblaetter_pdf(lauf: Lauf, schule_name: str) -> bytes:
     """Eine Seite je Posten. Das Blatt geht an die Eltern."""
+    if len(lauf.strecke.posten)>100:raise HTTPException(413,"Höchstens 100 Posten je Export")
     tokens = {t.posten_id: t for t in lauf.tokens}
     blaetter = [
         {
@@ -158,6 +166,7 @@ UEBERSICHT_PX = (1200, 1000)
 POSTEN_PX = (1200, 860)
 
 
+@begrenzter_export
 def streckenplan_pdf(strecke: Strecke, schule_name: str) -> bytes:
     """Streckenplan: Übersichtskarte der Gesamtstrecke, dann eine Seite je Posten.
 
@@ -166,6 +175,7 @@ def streckenplan_pdf(strecke: Strecke, schule_name: str) -> bytes:
     Posten ohne Standort bekommen ihre Seite ohne Karte; fällt der Kachelserver
     aus, entsteht der Plan ohne Bilder statt gar nicht.
     """
+    if len(strecke.posten)>100:raise HTTPException(413,"Höchstens 100 Posten je Export")
     linie = (strecke.verlauf or {}).get("linie", [])
     verortet = _verortet(strecke)
 

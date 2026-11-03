@@ -14,6 +14,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
 from app.config import einstellungen
+from app.betrieb import belasten, entlasten
 from app.web.abhaengigkeiten import CsrfFehler, csrf_pruefen, fabrik, sitzung_optional
 from app.web.sitzung import (
     COOKIE_NAME,
@@ -72,13 +73,14 @@ def anmelden_absenden(
     passwort: Annotated[str, Form()] = "",
     csrf: Annotated[str, Form()] = "",
 ):
+    if len(email)>254 or len(passwort)>256 or len(csrf)>128:
+        return _anmeldeseite(request,"Ungültige Anmeldedaten",status_code=400)
     cookie = request.cookies.get(ANMELDE_CSRF_COOKIE, "")
     if not cookie or not hmac.compare_digest(cookie, csrf):
         raise CsrfFehler
 
-    bremse = _bremse(request)
     schluessel = (f"email:{email.strip().lower()}", f"ip:{request.client.host if request.client else '-'}")
-    if bremse.gesperrt(*schluessel):
+    if not belasten(fabrik(request),schluessel,einstellungen().anmeldung_max_fehlversuche,900):
         return _anmeldeseite(
             request,
             "Zu viele Fehlversuche. Bitte warte 15 Minuten und versuche es dann erneut.",
@@ -87,10 +89,9 @@ def anmelden_absenden(
 
     ergebnis = anmelden(fabrik(request), email, passwort)
     if ergebnis is None:
-        bremse.fehlschlag(*schluessel)
         return _anmeldeseite(request, "E-Mail-Adresse oder Passwort stimmen nicht.", status_code=401)
 
-    bremse.erfolg(*schluessel)
+    entlasten(fabrik(request),schluessel)
     # Vorherige Sitzung dieses Browsers verwerfen (keine Sitzungsfixierung).
     sitzung_beenden(fabrik(request), request.cookies.get(COOKIE_NAME))
     cookie_wert = sitzung_anlegen(fabrik(request), ergebnis.benutzer_id)

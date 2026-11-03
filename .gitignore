@@ -6,3 +6,5 @@ __pycache__/
 # Eigene Vorlagen (außer der Erklärung)
 vorlagen/*
 !vorlagen/LIESMICH.txt
+
+.private/

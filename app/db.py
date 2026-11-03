@@ -10,7 +10,7 @@ from app.mandant import Sitzungsfabrik
 
 @lru_cache
 def engine() -> Engine:
-    return create_engine(einstellungen().database_url, pool_pre_ping=True)
+    return create_engine(einstellungen().database_url, pool_pre_ping=True, pool_size=5, max_overflow=0, pool_timeout=3, connect_args={"connect_timeout": 3})
 
 
 @lru_cache

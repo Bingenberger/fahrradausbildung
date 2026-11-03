@@ -499,7 +499,13 @@ class AdminSitzung(Basis):
         return f"<AdminSitzung benutzer_id={self.benutzer_id}>"
 
 
-INFRASTRUKTURMODELLE: tuple[type, ...] = (AdminSitzung,)
+class BetriebsLimit(Basis):
+    __tablename__ = "betriebs_limit"
+    schluessel: Mapped[str] = mapped_column(String(64), primary_key=True)
+    anzahl: Mapped[int] = mapped_column(Integer)
+    bis: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+INFRASTRUKTURMODELLE: tuple[type, ...] = (AdminSitzung, BetriebsLimit)
 
 
 MANDANTENMODELLE: tuple[type[Mandantenmodell], ...] = (
