@@ -140,6 +140,7 @@ button { font: inherit; color: inherit; }
 
 .statusleiste {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 16px;
   min-height: 52px;
@@ -150,8 +151,9 @@ button { font: inherit; color: inherit; }
   font-weight: 600;
 }
 
-.statusleiste-posten { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.statusleiste-zaehler { white-space: nowrap; }
+.statusleiste-posten { flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.statusleiste-zaehler { flex: 1 1 240px; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.statusleiste-knopf { flex-shrink: 0; }
 .statusleiste-netz {
   white-space: nowrap;
   padding: 2px 10px;
