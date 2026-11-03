@@ -8,6 +8,7 @@ Cache und IndexedDB müssen das überstehen.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, date, datetime
 
 import pytest
@@ -176,7 +177,7 @@ def test_flugmodus_mit_neustart(pw, basis_url, fabrik, lauf, tmp_path, browser_t
 
     # Wiederverbindung: automatischer Upload
     geraet.offline(False)
-    expect(seite.locator("#status-zaehler")).to_have_text("0 · alles übertragen", timeout=30_000)
+    expect(seite.locator("#status-zaehler")).to_have_text(re.compile(r"^0 · alles übertragen(?: · Display sperrt sich)?$"), timeout=30_000)
 
     server = server_ereignisse(fabrik, lauf["lauf_id"])
     assert set(server) == {e["event_id"] for e in lokal}
@@ -221,7 +222,7 @@ def test_abgebrochener_upload(pw, basis_url, fabrik, lauf, tmp_path):
     expect(seite.locator("#status-zaehler")).to_contain_text("10 Erfassungen · nicht übertragen")
 
     seite.click("#uebertragen")
-    expect(seite.locator("#status-zaehler")).to_have_text("0 · alles übertragen", timeout=15_000)
+    expect(seite.locator("#status-zaehler")).to_have_text(re.compile(r"^0 · alles übertragen(?: · Display sperrt sich)?$"), timeout=15_000)
     assert len(versuche) == 2
     assert len(server_ereignisse(fabrik, lauf["lauf_id"])) == 10
     geraet.beenden()
@@ -241,7 +242,7 @@ def test_keine_namen_auf_dem_geraet(pw, basis_url, fabrik, lauf, tmp_path):
     seite.click("#bewertung-stufen .stufe-2")
     seite.click("#bewertung-fertig")
     seite.click("#uebertragen")
-    expect(seite.locator("#status-zaehler")).to_have_text("0 · alles übertragen", timeout=15_000)
+    expect(seite.locator("#status-zaehler")).to_have_text(re.compile(r"^0 · alles übertragen(?: · Display sperrt sich)?$"), timeout=15_000)
 
     inhalt = json.dumps(geraet.indexeddb(), ensure_ascii=False)
     assert '"startnummern"' in inhalt and "bremst spät" in inhalt  # Gegenprobe: Daten sind da
@@ -261,7 +262,7 @@ def test_nach_abschluss_werden_lokale_daten_geloescht(pw, basis_url, fabrik, lau
     seite = einrichten(geraet, lauf["tokens"][0])
     erfassen(seite, 3)
     seite.click("#uebertragen")
-    expect(seite.locator("#status-zaehler")).to_have_text("0 · alles übertragen", timeout=15_000)
+    expect(seite.locator("#status-zaehler")).to_have_text(re.compile(r"^0 · alles übertragen(?: · Display sperrt sich)?$"), timeout=15_000)
     assert len(geraet.indexeddb()["ereignisse"]["werte"]) == 3  # noch nicht löschen: Lauf läuft
 
     with fabrik.intern_kontext() as s:
@@ -299,7 +300,7 @@ def test_offene_daten_bleiben_wenn_lauf_zu_frueh_abgeschlossen(pw, basis_url, fa
     with fabrik.intern_kontext() as s:
         s.get(Lauf, lauf["lauf_id"]).status = "laufend"
     seite.click("#uebertragen")
-    expect(seite.locator("#status-zaehler")).to_have_text("0 · alles übertragen", timeout=15_000)
+    expect(seite.locator("#status-zaehler")).to_have_text(re.compile(r"^0 · alles übertragen(?: · Display sperrt sich)?$"), timeout=15_000)
     assert len(server_ereignisse(fabrik, lauf["lauf_id"])) == 4
     geraet.beenden()
 
@@ -354,7 +355,7 @@ def test_versehentlicher_wechsel_offline_behaelt_alten_posten(pw, basis_url, fab
     seite = einrichten(geraet, lauf["tokens"][0])
     erfassen(seite, 2)
     seite.click("#uebertragen")
-    expect(seite.locator("#status-zaehler")).to_have_text("0 · alles übertragen", timeout=15_000)
+    expect(seite.locator("#status-zaehler")).to_have_text(re.compile(r"^0 · alles übertragen(?: · Display sperrt sich)?$"), timeout=15_000)
     geraet.beenden()
 
     seite = geraet.starten(f"/p/{lauf['tokens'][1]}", offline=True)
