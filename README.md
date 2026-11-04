@@ -3,6 +3,49 @@
 Webanwendung zur Begleitung der Radfahrausbildung an Grundschulen.
 Verbindliche Spezifikation: [`fahrradpruefung-app-spec.md`](fahrradpruefung-app-spec.md).
 
+<!-- schulplattform:installation -->
+## Installation
+
+### Im Rahmen der Schulplattform
+
+Empfohlen für den Schulserver: Die [Schulplattform](https://github.com/Bingenberger/schulplattform) installiert diese App zusammen mit den
+anderen Schul-Apps auf einem leeren Ubuntu-24.04-Server, mit eigener Subdomain, TLS-Zertifikat, Mailversand,
+Sicherung und Dashboard. Sie verwendet das signierte Release-Image `ghcr.io/bingenberger/fahrradausbildung`
+und die unveränderte `docker-compose.yml` dieses Repositorys plus eine Override-Datei.
+
+1. In der Plattformkonfiguration (`./install.sh configure` bzw. `/etc/schulplattform/platform.toml`)
+   unter `[apps.fahrradausbildung]` `enabled = true` und den Hostnamen setzen, z. B. `rad.ihre-schule.de`,
+   und beim DNS-Provider einen A-Eintrag auf den Server anlegen.
+2. `./install.sh apply …` installiert die App. Migration, Proxy, Zertifikat und Sicherung übernimmt die Plattform.
+3. `./install.sh app-setup fahrradausbildung` legt den persönlichen Systemadmin per E-Mail an (`python -m app.kommandos systemadmin-anlegen`, Passwort am Terminal).
+4. Daten vom bisherigen Server übernehmen: `./install.sh import fahrradausbildung …` nach dem
+   [Umzugs-Runbook](https://github.com/Bingenberger/schulplattform/blob/main/docs/betrieb/umzug.md).
+
+### Standalone mit Docker Compose
+
+Ohne Plattform, z. B. zum Ausprobieren oder für einen eigenen Server mit eigenem Proxy.
+Benötigt Docker Engine mit Compose v2 (amd64). Die App lauscht danach nur auf `http://127.0.0.1:8000`.
+
+```sh
+python3 prepare_secrets.py
+export FP_SECRETS_DIR="$PWD/.private"
+export FP_OEFFENTLICHE_URL="https://fahrrad.example.org"
+docker compose build
+docker compose up -d --wait db
+docker compose run --rm --no-deps app python -m app.migrate
+docker compose up -d --no-build
+docker compose exec app python -m app.kommandos systemadmin-anlegen PERSOENLICHE_EMAIL
+```
+
+Hinter einem eigenen Proxy `FP_PROXY_IPS` exakt setzen (siehe [PLATFORM.md](PLATFORM.md)).
+
+Statt selbst zu bauen, kann das veröffentlichte Image verwendet werden (dann `docker compose build` weglassen):
+
+```sh
+docker pull ghcr.io/bingenberger/fahrradausbildung:0.1.0 && docker tag ghcr.io/bingenberger/fahrradausbildung:0.1.0 fahrradausbildung:0.1.0-dev
+```
+<!-- /schulplattform:installation -->
+
 ## Stand
 
 - [x] Schritt 1 – Datenmodell, Migrationen, Mandanten-Schicht, Tests
