@@ -27,6 +27,34 @@
 </section>
 
 {% if basis == "/verwaltung" %}
+<section class="karte schmal" id="posten-pin">
+  <h2>{{ symbol("lock-open") }} PIN für die Posten-App</h2>
+  <p>Werden die iPads auch im Unterricht genutzt, kann die Posten-App vor dem Öffnen
+    eine vierstellige PIN abfragen. So können Kinder die vorbereitete App nicht bedienen.</p>
+  {% if posten_pin %}
+  <p><strong>Die PIN-Abfrage ist eingeschaltet. Aktuelle PIN: {{ posten_pin }}</strong></p>
+  {% else %}
+  <p><strong>Die PIN-Abfrage ist ausgeschaltet.</strong></p>
+  {% endif %}
+  <p class="hilfe">Die iPads übernehmen eine Änderung, sobald die App im WLAN geöffnet wird.
+    Teile die PIN den Helferinnen und Helfern an den Posten mit.</p>
+  <form method="post" action="/verwaltung/konto/posten-pin" class="formular">
+    {{ csrf_feld() }}
+    <label>{% if posten_pin %}Neue PIN{% else %}PIN{% endif %} <span class="hilfe">genau vier Ziffern</span>
+      <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4"
+        autocomplete="off" required>
+    </label>
+    <button type="submit" class="knopf knopf-haupt">{{ symbol("floppy-disk") }} PIN speichern</button>
+  </form>
+  {% if posten_pin %}
+  <form method="post" action="/verwaltung/konto/posten-pin">
+    {{ csrf_feld() }}
+    <input type="hidden" name="entfernen" value="1">
+    <button type="submit" class="knopf">{{ symbol("x") }} PIN-Abfrage ausschalten</button>
+  </form>
+  {% endif %}
+</section>
+
 <section class="karte schmal">
   <h2>{{ symbol("download-simple") }} Datenexport</h2>
   <p>Alle Daten deiner Schule als JSON-Datei: Strecken, Gruppen mit Startnummern, Läufe und alle Erfassungen.

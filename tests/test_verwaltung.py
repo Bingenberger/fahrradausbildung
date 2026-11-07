@@ -530,6 +530,38 @@ def test_passwort_aendern(client, schulen):
     assert anmelden(client, a.email, "ganz-neues-pw").status_code == 303
 
 
+def test_posten_pin_setzen_und_entfernen(client, fabrik, schulen):
+    a, b = schulen
+    csrf = angemeldet(client, a.email)
+    assert "PIN-Abfrage ist ausgeschaltet" in client.get("/verwaltung/konto").text
+
+    for falsch in ("123", "12345", "12a4", "١٢٣٤"):
+        client.post("/verwaltung/konto/posten-pin", data={"pin": falsch, "csrf": csrf})
+        assert "genau vier Ziffern" in client.get("/verwaltung/konto").text
+    with fabrik.intern_kontext() as s:
+        assert s.get(Schule, a.schule).posten_pin is None
+
+    client.post("/verwaltung/konto/posten-pin", data={"pin": " 0815 ", "csrf": csrf})
+    seite = client.get("/verwaltung/konto").text
+    assert "Aktuelle PIN: 0815" in seite
+    with fabrik.intern_kontext() as s:
+        assert s.get(Schule, a.schule).posten_pin == "0815"
+        assert s.get(Schule, b.schule).posten_pin is None  # nur die eigene Schule
+
+    client.post("/verwaltung/konto/posten-pin", data={"entfernen": "1", "csrf": csrf})
+    with fabrik.intern_kontext() as s:
+        assert s.get(Schule, a.schule).posten_pin is None
+
+
+def test_posten_pin_nur_mit_csrf(client, fabrik, schulen):
+    a, _ = schulen
+    angemeldet(client, a.email)
+    r = client.post("/verwaltung/konto/posten-pin", data={"pin": "1234"})
+    assert r.status_code in (400, 403)
+    with fabrik.intern_kontext() as s:
+        assert s.get(Schule, a.schule).posten_pin is None
+
+
 # --------------------------------------------------------------------------- Systemadmin
 
 

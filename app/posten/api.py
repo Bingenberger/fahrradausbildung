@@ -30,7 +30,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.mandant import FPSession
 from app.betrieb import PostenBremse
-from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, PostenToken
+from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, PostenToken, Schule
 from app.token import token_gueltig
 
 log = logging.getLogger("fahrradpruefung.posten")
@@ -174,6 +174,9 @@ def konfiguration(request: Request, token: str):
             # legt die Liste lokal ab: Nach dem Abschließen des Laufs ist dieses
             # Token entwertet, und der Endpunkt antwortet dann mit 404.
             "weitere_laeufe": _weitere_laeufe(session, z),
+            # Optionale PIN vor der App (None = keine Abfrage). Die App legt sie lokal ab,
+            # damit die Sperre auch offline greift.
+            "pin": session.get(Schule, z.lauf.schule_id).posten_pin,
         }
         z.token.letzter_abruf = datetime.now(UTC)
         session.commit()

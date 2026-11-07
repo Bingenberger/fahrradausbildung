@@ -5,6 +5,8 @@ from alembic.config import Config
 from sqlalchemy import inspect,text
 from app.db import engine
 LOCK=762431802
+# Exakte Schemarevision, die diese Codeversion erwartet (/health/ready, /gesund).
+SCHEMA_REVISION="0009"
 def migrate():
     config=Config(str(Path(__file__).resolve().parents[1]/"alembic.ini"))
     with engine().begin() as connection:

@@ -77,6 +77,7 @@ def _in_list(text_: str) -> str:
 
 class Schule(Mandantenmodell, Basis):
     __tablename__ = "schule"
+    __table_args__ = (CheckConstraint("posten_pin ~ '^[0-9]{4}$'", name="posten_pin"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
@@ -85,6 +86,11 @@ class Schule(Mandantenmodell, Basis):
     erstellt_am: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Optionale vierstellige PIN vor der Posten-App auf den iPads: In manchen Schulen
+    # werden die Geräte auch im Unterricht genutzt. Bewusst im Klartext – die Lehrkraft
+    # muss sie in der Verwaltung nachsehen können, und die App braucht sie offline.
+    # Sie schützt vor neugierigen Kindern, nicht vor Angreifern.
+    posten_pin: Mapped[str | None] = mapped_column(String(4))
 
     @classmethod
     def mandant_kriterium(cls, schule_id: int) -> ColumnElement[bool]:

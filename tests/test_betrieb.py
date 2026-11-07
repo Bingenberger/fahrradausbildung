@@ -14,6 +14,17 @@ def test_gesund(client):
     assert antwort.json() == {"ok": True}
 
 
+def test_erwartete_schemarevision_ist_die_neueste_migration():
+    """Sonst meldet sich die App nach einer neuen Migration dauerhaft als nicht bereit."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    from app.migrate import SCHEMA_REVISION
+
+    skript = ScriptDirectory.from_config(Config(str(PROJEKT / "alembic.ini")))
+    assert skript.get_heads() == [SCHEMA_REVISION]
+
+
 def test_env_example_nennt_alle_einstellungen():
     text = (PROJEKT / ".env.example").read_text(encoding="utf-8")
     vorhanden = set(re.findall(r"^(FP_[A-Z_]+)=", text, flags=re.M))

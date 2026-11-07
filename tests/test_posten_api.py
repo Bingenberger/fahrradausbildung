@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from sqlalchemy import func, select
 
-from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, Posten, PostenToken, Strecke
+from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, Posten, PostenToken, Schule, Strecke
 from app.sicherheit import neues_token
 from app.token import token_ablauf
 
@@ -77,7 +77,8 @@ def test_konfiguration(client, fabrik, lauf):
     assert r.status_code == 200
     assert r.headers["cache-control"] == "no-store"
     k = r.json()
-    assert set(k) == {"lauf_id", "datum", "posten", "items", "startnummern", "weitere_laeufe"}
+    assert set(k) == {"lauf_id", "datum", "posten", "items", "startnummern", "weitere_laeufe", "pin"}
+    assert k["pin"] is None  # Standard: keine PIN-Abfrage
     assert k["lauf_id"] == lauf["lauf_id"]
     assert k["datum"] == date.today().isoformat()
     assert k["posten"] == {"id": lauf["posten_id"], "name": "Kreuzung"}
@@ -98,6 +99,14 @@ def test_konfiguration_enthaelt_keine_namen(client, fabrik, lauf):
     text = client.get(f"/api/p/{lauf['token']}/config").text
     for name in lauf["namen"]:
         assert name not in text
+
+
+def test_konfiguration_enthaelt_pin_der_schule(client, fabrik, schulen, lauf):
+    a, b = schulen
+    with fabrik.intern_kontext() as s:
+        s.get(Schule, a.schule).posten_pin = "4711"
+        s.get(Schule, b.schule).posten_pin = "0000"
+    assert client.get(f"/api/p/{lauf['token']}/config").json()["pin"] == "4711"
 
 
 # ----------------------------------------------------------- Wechsel auf den nächsten Lauf

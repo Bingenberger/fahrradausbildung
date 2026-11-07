@@ -14,7 +14,7 @@ from datetime import UTC, date, datetime
 import pytest
 from sqlalchemy import select
 
-from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, Posten, PostenToken, Strecke
+from app.modelle import Ereignis, Gruppe, Item, Kind, Lauf, Posten, PostenToken, Schule, Strecke
 from app.sicherheit import neues_token
 from app.token import token_ablauf
 from tests.test_posten_frontend import server_starten
@@ -365,4 +365,128 @@ def test_versehentlicher_wechsel_offline_behaelt_alten_posten(pw, basis_url, fab
     seite = geraet.starten(f"/p/{lauf['tokens'][0]}", offline=True)
     expect(seite.locator("#haupt")).to_be_visible(timeout=15_000)
     expect(seite.locator("#status-posten")).to_have_text("Posten Nord")
+    geraet.beenden()
+
+
+# --------------------------------------------------------------------------- PIN-Sperre
+
+
+def pin_setzen(fabrik, schule_id: int, pin: str | None):
+    with fabrik.intern_kontext() as s:
+        s.get(Schule, schule_id).posten_pin = pin
+
+
+def pin_tippen(seite, pin: str):
+    for z in pin:
+        seite.locator(".sperre-taste", has_text=re.compile(f"^{z}$")).click()
+
+
+def test_ohne_pin_keine_sperre(pw, basis_url, fabrik, lauf, tmp_path):
+    geraet = Geraet(pw, "chromium", tmp_path / "profil", basis_url)
+    seite = einrichten(geraet, lauf["tokens"][0])
+    assert seite.locator("#sperre").count() == 0
+    geraet.beenden()
+
+
+@pytest.mark.parametrize("browser_typ", BROWSER)
+def test_pin_sperre_auch_offline(pw, basis_url, fabrik, schulen, lauf, tmp_path, browser_typ):
+    """Mit PIN der Schule: App gesperrt bis zur richtigen PIN – auch nach Neustart ohne Netz."""
+    a, _ = schulen
+    pin_setzen(fabrik, a.schule, "2468")
+    geraet = Geraet(pw, browser_typ, tmp_path / "profil", basis_url)
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}")
+    expect(seite.locator("#sperre")).to_be_visible(timeout=15_000)
+    expect(seite.locator("#sperre-posten")).to_have_text("Posten Nord")
+    pin_tippen(seite, "1111")
+    expect(seite.locator("#sperre-meldung")).to_contain_text("Falsche PIN")
+    expect(seite.locator("#sperre")).to_be_visible()
+    pin_tippen(seite, "2468")
+    expect(seite.locator("#sperre")).to_be_hidden()
+    expect(seite.locator("#einrichtung-offline")).to_have_text(BEREIT, timeout=30_000)
+    seite.click("#start")
+    erfassen(seite, 2)
+    geraet.beenden()
+
+    # Kinder öffnen die App später im Unterricht – ohne WLAN.
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}", offline=True)
+    expect(seite.locator("#sperre")).to_be_visible(timeout=15_000)
+    assert seite.locator("#sperre").evaluate("e => getComputedStyle(e).zIndex") == "100"
+    pin_tippen(seite, "2468")
+    expect(seite.locator("#sperre")).to_be_hidden()
+    expect(seite.locator("#status-zaehler")).to_contain_text("2 Erfassungen")
+    geraet.beenden()
+
+
+def test_pin_aenderung_und_abschalten_wirken_beim_naechsten_start(pw, basis_url, fabrik, schulen, lauf, tmp_path):
+    a, _ = schulen
+    pin_setzen(fabrik, a.schule, "1234")
+    geraet = Geraet(pw, "chromium", tmp_path / "profil", basis_url)
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}")
+    pin_tippen(seite, "1234")
+    expect(seite.locator("#sperre")).to_be_hidden()
+    geraet.beenden()
+
+    pin_setzen(fabrik, a.schule, "9876")
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}")
+    expect(seite.locator("#sperre")).to_be_visible(timeout=15_000)
+    pin_tippen(seite, "1234")
+    expect(seite.locator("#sperre-meldung")).to_contain_text("Falsche PIN")
+    pin_tippen(seite, "9876")
+    expect(seite.locator("#sperre")).to_be_hidden()
+    geraet.beenden()
+
+    pin_setzen(fabrik, a.schule, None)
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}")
+    expect(seite.locator("#einrichtung")).to_be_visible(timeout=15_000)
+    assert seite.locator("#sperre").count() == 0
+    geraet.beenden()
+
+
+def test_zu_viele_fehlversuche_sperren_die_tastatur_auch_ueber_neustart(pw, basis_url, fabrik, schulen, lauf, tmp_path):
+    a, _ = schulen
+    pin_setzen(fabrik, a.schule, "2468")
+    geraet = Geraet(pw, "chromium", tmp_path / "profil", basis_url)
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}")
+    expect(seite.locator("#sperre")).to_be_visible(timeout=15_000)
+    for _ in range(5):
+        pin_tippen(seite, "0000")
+    expect(seite.locator("#sperre-meldung")).to_contain_text("Sekunden warten")
+    expect(seite.locator(".sperre-taste").first).to_be_disabled()
+    geraet.beenden()
+
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}")
+    expect(seite.locator("#sperre-meldung")).to_contain_text("Sekunden warten", timeout=15_000)
+    expect(seite.locator(".sperre-taste").first).to_be_disabled()
+    geraet.beenden()
+
+
+def test_nach_laengerem_hintergrund_wieder_gesperrt(pw, basis_url, fabrik, schulen, lauf, tmp_path):
+    a, _ = schulen
+    pin_setzen(fabrik, a.schule, "2468")
+    geraet = Geraet(pw, "chromium", tmp_path / "profil", basis_url)
+    seite = geraet.starten(f"/p/{lauf['tokens'][0]}")
+    seite.clock.install()
+    expect(seite.locator("#sperre")).to_be_visible(timeout=15_000)
+    pin_tippen(seite, "2468")
+    expect(seite.locator("#sperre")).to_be_hidden()
+
+    def wegschalten(ms: int):
+        seite.evaluate(
+            """() => {
+                Object.defineProperty(document, 'hidden', {value: true, configurable: true});
+                document.dispatchEvent(new Event('visibilitychange'));
+            }"""
+        )
+        seite.clock.fast_forward(ms)
+        seite.evaluate(
+            """() => {
+                Object.defineProperty(document, 'hidden', {value: false, configurable: true});
+                document.dispatchEvent(new Event('visibilitychange'));
+            }"""
+        )
+
+    wegschalten(30_000)  # kurz: keine PIN
+    expect(seite.locator("#sperre")).to_be_hidden()
+    wegschalten(3 * 60_000)
+    expect(seite.locator("#sperre")).to_be_visible()
     geraet.beenden()

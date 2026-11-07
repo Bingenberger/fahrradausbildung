@@ -292,6 +292,25 @@ Der Wake Lock ist die Absicherung für Geräte, die nicht so eingerichtet wurden
 Der Geführte Zugriff hilft hier übrigens nicht – er verhindert nur das Verlassen
 der App, nicht die Display-Sperre.
 
+### PIN vor der App (`app/posten_app/js/sperre.js`)
+
+Manche Schulen nutzen die Prüfungs-iPads auch im Unterricht. Damit Kinder die
+vorbereitete App nicht öffnen und bedienen können, kann der Schuladmin unter
+**Verwaltung → Konto → PIN für die Posten-App** eine vierstellige PIN setzen
+(`schule.posten_pin`, standardmäßig leer = keine Abfrage).
+
+- Die PIN kommt mit `GET /api/p/{token}/config` und liegt lokal in IndexedDB,
+  damit die Sperre auch offline greift. Eine Änderung übernimmt das iPad beim
+  nächsten Öffnen im WLAN.
+- Abgefragt wird beim Öffnen der App und nach mehr als zwei Minuten im
+  Hintergrund. Kurzes Wegschalten bleibt ohne PIN.
+- Nach fünf Fehlversuchen sind die Tasten 30 Sekunden gesperrt, auch über
+  einen Neustart der App hinweg.
+- Die PIN steht bewusst im Klartext in der Datenbank: Die Lehrkraft muss sie
+  nachsehen können, sonst wäre ein iPad mit nicht übertragenen Erfassungen
+  ausgesperrt. Sie schützt vor neugierigen Kindern, nicht vor Angreifern.
+  Der Datenexport enthält sie nicht.
+
 ### Token-API (`app/posten/api.py`)
 
 - `GET /api/p/{token}/config` – nur Startnummern aktiver Kinder, keine Namen.

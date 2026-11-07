@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import protokoll, system, verwaltung
 from app.mandant import Mandantenverletzung, NichtGefunden, Sitzungsfabrik
+from app.migrate import SCHEMA_REVISION
 from app.modelle import Schule
 from app.posten import api as posten_api
 from app.posten import seiten as posten_seiten
@@ -65,7 +66,7 @@ def erstelle_app(fabrik: Sitzungsfabrik | None = None) -> FastAPI:
         try:
             with fabrik.intern_kontext() as session:
                 revision=session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-                if revision!=["0008"]:
+                if revision!=[SCHEMA_REVISION]:
                     return JSONResponse({"ok":False},status_code=503)
                 session.execute(select(Schule.id).limit(1))
         except SQLAlchemyError:

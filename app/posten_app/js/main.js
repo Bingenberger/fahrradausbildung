@@ -16,6 +16,7 @@ import {
   stornoEreignis,
 } from "./logik.js";
 import { offlineEinrichten } from "./offline.js";
+import * as sperre from "./sperre.js";
 import * as speicher from "./speicher.js";
 import * as verbindung from "./verbindung.js";
 import * as wach from "./wachbleiben.js";
@@ -106,6 +107,8 @@ async function start() {
   if (!konfig.startnummern.includes(zustand.aktuell)) zustand.aktuell = konfig.startnummern[0];
 
   verdrahten();
+  // Vor dem ersten Bild sperren, damit die App nie kurz offen zu sehen ist.
+  await sperre.einrichten(konfig.pin ?? null, konfig.posten.name);
 
   const gestartet = await speicher.zustandLesen("gestartet", false);
   if (!gestartet || parameter.has("einrichtung")) einrichtungZeigen();

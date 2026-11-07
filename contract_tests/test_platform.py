@@ -53,7 +53,7 @@ def test_chunked_body_limit_without_content_length(client):
 def test_migration_exclusive_and_preserves_ids(engine,schulen):
     from alembic import command
     from alembic.config import Config
-    from app.migrate import LOCK
+    from app.migrate import LOCK, SCHEMA_REVISION
     from tests.conftest import PROJEKT
     with engine.begin() as held:
         held.execute(text("SELECT pg_advisory_xact_lock(:key)"),{"key":LOCK})
@@ -62,5 +62,5 @@ def test_migration_exclusive_and_preserves_ids(engine,schulen):
     with engine.begin() as connection:
         config=Config(str(PROJEKT/"alembic.ini"));config.attributes["connection"]=connection
         command.upgrade(config,"head")
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()=="0008"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()==SCHEMA_REVISION
         assert connection.execute(text("SELECT id FROM schule ORDER BY id")).scalars().all()==[schulen[0].schule,schulen[1].schule]

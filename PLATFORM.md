@@ -39,8 +39,9 @@ Keine SSO-Pflicht vor der Posten-App.
 
 ## Migration und Übernahme
 
-Version 0008 ergänzt ausschließlich betriebliche Limitdaten; bestehende Fach-IDs,
-Posten-Tokens und Ereignisse bleiben erhalten. Der explizite Job hält eine
+Version 0008 ergänzt ausschließlich betriebliche Limitdaten, Version 0009 die
+optionale Spalte `schule.posten_pin` (PIN vor der Posten-App, standardmäßig leer);
+bestehende Fach-IDs, Posten-Tokens und Ereignisse bleiben erhalten. Der explizite Job hält eine
 PostgreSQL-Transaktionssperre. Gleichzeitige Migration wartet begrenzt, Fehler
 rollen die Transaktion zurück. Unversionierte Bestandsdaten werden nicht automatisch
 adoptiert; unbekannte Revisionen scheitern. Migration niemals beim Webstart.
@@ -73,7 +74,7 @@ Gehasht gespeicherte Schlüssel, abgelaufene Einträge werden entfernt, maximal
 UID/GID 10001, Read-only-Root, 128 MiB /tmp, 768 MiB RAM, eine CPU und 128 PIDs.
 DB eigenes pgdata, 512 MiB/eine CPU. Das sind konfigurierte Grenzen, keine
 Kapazitätsmessung. /health/live ist unabhängig von DB/Karten/SMTP;
- /health/ready und /gesund verlangen eigene DB und genau Revision 0008.
+ /health/ready und /gesund verlangen eigene DB und genau Revision 0009 (`app.migrate.SCHEMA_REVISION`).
 DB-Healthcheck nutzt TCP und prüft dadurch nicht den temporären Socket-Initserver.
 Keine Accesslogs mit Postentokens; SQL-Fehler liefern generische 503-Antwort.
 
