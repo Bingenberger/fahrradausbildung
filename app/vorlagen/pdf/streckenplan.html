@@ -28,7 +28,8 @@
     </figure>
   {% else %}
     <p class="ohne-karte">Keine Übersichtskarte: {% if blaetter and not verortet and not laenge_m %}Für diese Strecke ist
-      noch kein Verlauf eingezeichnet und kein Posten verortet.{% else %}Die Kartenbilder konnten nicht geladen
+      noch kein Verlauf eingezeichnet und kein Posten verortet.{% elif karten_aus %}Kartenbilder sind auf diesem
+      Server abgeschaltet (Einstellung FP_KARTEN_KACHELN ist leer).{% else %}Die Kartenbilder konnten nicht geladen
       werden.{% endif %}</p>
   {% endif %}
 
@@ -64,6 +65,8 @@
   {% elif b.posten.lat is none %}
     <p class="ohne-karte">Dieser Posten hat noch keinen Standort auf der Karte.
       Nachtragen unter „Strecken → {{ strecke.name }} → Auf der Karte planen".</p>
+  {% elif karten_aus %}
+    <p class="ohne-karte">Kartenbilder sind auf diesem Server abgeschaltet (Einstellung FP_KARTEN_KACHELN ist leer).</p>
   {% else %}
     <p class="ohne-karte">Die Kartenbilder konnten nicht geladen werden.</p>
   {% endif %}

@@ -96,7 +96,8 @@ alle Postengeräte online synchronisieren, lokalen Stand prüfen, erst dann umst
 und Geräte neu einrichten. Nicht synchronisierte Browserdaten sind kein Serverbackup.
 Offline-Sperren können erst beim Wiederverbinden wirken.
 
-Serverseitige Kartenkacheln sind im Compose standardmäßig deaktiviert; bei Ausfall
+Serverseitige Kartenkacheln sind im Compose standardmäßig deaktiviert (in der Schulplattform:
+`karten = true` unter `[apps.fahrradausbildung]` schaltet sie ein); bei Ausfall
 bleiben PDF/Kernbetrieb verfügbar. Die interaktive Kartenseite kann weiterhin die
 vorhandenen externen Karten-, Routing- und Suchanbieter ansprechen. Deren
 Nutzungsbedingungen, Attribution und datenschutzrechtliche Freigabe bleiben

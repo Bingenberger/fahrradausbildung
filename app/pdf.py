@@ -210,4 +210,5 @@ def streckenplan_pdf(strecke: Strecke, schule_name: str) -> bytes:
         verortet=len(verortet),
         blaetter=blaetter,
         zoom_posten=ZOOM_POSTEN,
+        karten_aus=not einstellungen().karten_kacheln,
     )
